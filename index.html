@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PassUni Admin — Hệ Thống Quản Trị & Kiểm Duyệt Chợ Đồ Cũ Sinh Viên</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            primary: {
+              DEFAULT: '#006948',
+              hover: '#005137',
+              light: '#ECFDF5',
+              border: '#A7F3D0'
+            },
+            coral: {
+              DEFAULT: '#EA580C',
+              light: '#FFF7ED',
+              border: '#FED7AA'
+            },
+            campus: {
+              DEFAULT: '#0284C7',
+              light: '#F0F9FF',
+              border: '#BAE6FD'
+            },
+            slate: {
+              850: '#131B2E'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #F8FAFC;
+      color: #0F172A;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    @keyframes modalPop {
+      0% { opacity: 0; transform: scale(0.94) translateY(8px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes fadeSlideUp {
+      0% { opacity: 0; transform: translateY(10px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    .animate-modal {
+      animation: modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .animate-row {
+      animation: fadeSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #F1F5F9; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+  </style>
+</head>
+<body class="h-full flex overflow-hidden bg-slate-50 text-slate-900">
+
+  <!-- SIDEBAR NAVIGATION -->
+  <aside class="w-64 bg-white border-r border-slate-200 flex flex-col justify-between flex-shrink-0 z-20">
+    <div>
+      <!-- Brand Header -->
+      <div class="h-16 px-5 flex items-center justify-between border-b border-slate-100">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white shadow-sm">
+            <span class="material-symbols-outlined text-[20px]">Recycling</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="font-extrabold text-base tracking-tight text-slate-900">PassUni</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary-light text-primary border border-primary-border">Admin</span>
+            </div>
+            <p class="text-[11px] text-slate-500 font-medium">Quản trị Chợ Đồ Cũ SV</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <div class="p-3 space-y-1">
+        <p class="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Điều hành hệ thống</p>
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all bg-primary text-white shadow-sm">
+          <span class="flex items-center gap-2.5">
+            <span class="material-symbols-outlined text-[20px]">space_dashboard</span>
+            <span>Tổng quan & Thống kê</span>
+          </span>
+        </button>
+
+        <button onclick="switchTab('moderation')" id="nav-moderation" class="nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-all">
+          <span class="flex items-center gap-2.5">
+            <span class="material-symbols-outlined text-[20px]">fact_check</span>
+            <span>Kiểm duyệt tin đăng</span>
+          </span>
+          <span id="badge-pending" class="px-2 py-0.5 text-xs font-bold rounded-full bg-coral-light text-coral border border-coral-border tabular-nums">0</span>
+        </button>
+
+        <button onclick="switchTab('users')" id="nav-users" class="nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-all">
+          <span class="flex items-center gap-2.5">
+            <span class="material-symbols-outlined text-[20px]">school</span>
+            <span>Quản lý Sinh viên</span>
+          </span>
+          <span id="badge-users" class="px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-600 tabular-nums">0</span>
+        </button>
+
+        <p class="px-3 pt-4 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Liên kết nhanh</p>
+        <a href="../chodocu-frontend/stitch_student_flea_market_app/index.html" target="_blank" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-all">
+          <span class="flex items-center gap-2.5">
+            <span class="material-symbols-outlined text-[20px] text-primary">storefront</span>
+            <span>Mở App Chợ Sinh Viên</span>
+          </span>
+          <span class="material-symbols-outlined text-[16px] text-slate-400">open_in_new</span>
+        </a>
+        <a href="http://localhost:8080/swagger-ui.html" target="_blank" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-all">
+          <span class="flex items-center gap-2.5">
+            <span class="material-symbols-outlined text-[20px] text-campus">api</span>
+            <span>Tài liệu Swagger API</span>
+          </span>
+          <span class="material-symbols-outlined text-[16px] text-slate-400">open_in_new</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Bottom Admin Profile Card -->
+    <div class="p-3 border-t border-slate-200 bg-slate-50/60">
+      <div class="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm flex-shrink-0">
+            QT
+          </div>
+          <div class="min-w-0">
+            <p id="admin-name" class="text-xs font-bold text-slate-900 truncate">Ban Quản Trị PassUni</p>
+            <p id="admin-email" class="text-[11px] text-slate-500 truncate">admin@chodocu.edu.vn</p>
+          </div>
+        </div>
+        <button onclick="openLoginModal()" title="Đổi tài khoản / Đăng nhập JWT" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors">
+          <span class="material-symbols-outlined text-[18px]">key</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT WORKSPACE -->
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <!-- Top Bar -->
+    <header class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center gap-3">
+        <h1 id="page-title" class="text-lg font-extrabold text-slate-900 tracking-tight">Tổng quan Hệ thống Chợ Đồ Cũ Sinh Viên</h1>
+        <span id="connection-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-light text-primary border border-primary-border">
+          <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+          <span>Supabase PostgreSQL Connected</span>
+        </span>
+      </div>
+
+      <div class="flex items-center gap-2.5">
+        <button onclick="refreshAllData(true)" class="h-9 px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs">
+          <span class="material-symbols-outlined text-[16px]">refresh</span>
+          <span>Đồng bộ dữ liệu</span>
+        </button>
+        <button onclick="openCreatePostModal()" class="h-9 px-3.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm">
+          <span class="material-symbols-outlined text-[16px]">add_circle</span>
+          <span>Đăng tin mới</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Scrollable Content Area -->
+    <main class="flex-1 overflow-y-auto p-6 space-y-6">
+
+      <!-- TAB 1: DASHBOARD OVERVIEW -->
+      <section id="tab-dashboard" class="space-y-6">
+        <!-- KPI Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Tổng tin đăng</span>
+              <div class="w-9 h-9 rounded-xl bg-primary-light text-primary flex items-center justify-center">
+                <span class="material-symbols-outlined text-[20px]">inventory_2</span>
+              </div>
+            </div>
+            <div class="mt-3">
+              <p id="stat-total-products" class="text-3xl font-extrabold text-slate-900 tabular-nums">0</p>
+              <p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                <span class="text-primary font-semibold" id="stat-approved-products">0 đang hiển thị</span>
+                <span>•</span>
+                <span id="stat-sold-products">0 đã bán</span>
+              </p>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-coral-border bg-gradient-to-br from-white to-coral-light/40 shadow-2xs flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-coral">Chờ kiểm duyệt</span>
+              <div class="w-9 h-9 rounded-xl bg-coral-light text-coral flex items-center justify-center">
+                <span class="material-symbols-outlined text-[20px]">pending_actions</span>
+              </div>
+            </div>
+            <div class="mt-3 flex items-end justify-between">
+              <div>
+                <p id="stat-pending-products" class="text-3xl font-extrabold text-coral tabular-nums">0</p>
+                <p class="text-xs text-slate-600 mt-1">Tin mới sinh viên vừa đăng</p>
+              </div>
+              <button onclick="switchTab('moderation'); filterModerationStatus('PENDING');" class="px-2.5 py-1 rounded-lg bg-coral text-white text-xs font-bold hover:opacity-95 transition-opacity">
+                Duyệt ngay
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Sinh viên tham gia</span>
+              <div class="w-9 h-9 rounded-xl bg-campus-light text-campus flex items-center justify-center">
+                <span class="material-symbols-outlined text-[20px]">verified_user</span>
+              </div>
+            </div>
+            <div class="mt-3">
+              <p id="stat-total-students" class="text-3xl font-extrabold text-slate-900 tabular-nums">0</p>
+              <p class="text-xs text-campus font-semibold mt-1">100% Xác thực email .edu.vn</p>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Giá trị trao đổi KTX</span>
+              <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                <span class="material-symbols-outlined text-[20px]">payments</span>
+              </div>
+            </div>
+            <div class="mt-3">
+              <p id="stat-total-value" class="text-2xl font-extrabold text-primary tabular-nums">0 đ</p>
+              <p class="text-xs text-slate-500 mt-1"><span id="stat-total-orders" class="font-semibold text-slate-700">0</span> phiếu hẹn gặp an toàn</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Breakdown Charts & Recent Pending Queue -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Category Breakdown -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900">Phân bố theo Danh mục</h2>
+                <p class="text-xs text-slate-500">Tỷ trọng mặt hàng sinh viên thanh lý</p>
+              </div>
+              <span class="material-symbols-outlined text-slate-400 text-[20px]">category</span>
+            </div>
+            <div id="chart-categories" class="space-y-3"></div>
+          </div>
+
+          <!-- University Breakdown -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900">Khu vực Trường Đại học & KTX</h2>
+                <p class="text-xs text-slate-500">Mật độ tin đăng theo điểm trường</p>
+              </div>
+              <span class="material-symbols-outlined text-slate-400 text-[20px]">location_city</span>
+            </div>
+            <div id="chart-universities" class="space-y-3"></div>
+          </div>
+
+          <!-- Quick Moderation Queue -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h2 class="text-sm font-bold text-slate-900">Hàng đợi duyệt nhanh</h2>
+                  <p class="text-xs text-slate-500">Kiểm duyệt nội dung & hình ảnh thực tế</p>
+                </div>
+                <span class="px-2 py-0.5 text-[11px] font-bold rounded-full bg-coral-light text-coral">Ưu tiên</span>
+              </div>
+              <div id="quick-pending-list" class="space-y-2.5"></div>
+            </div>
+            <button onclick="switchTab('moderation')" class="mt-4 w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200/70 text-slate-700 text-xs font-bold transition-colors flex items-center justify-center gap-1">
+              <span>Mở toàn bộ danh sách kiểm duyệt</span>
+              <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: PRODUCT MODERATION -->
+      <section id="tab-moderation" class="hidden space-y-4">
+        <!-- Filter Bar -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-1.5 flex-wrap" id="status-filter-pills">
+            <button onclick="filterModerationStatus('ALL')" data-status="ALL" class="status-pill px-3 py-1.5 rounded-xl text-xs font-bold bg-primary text-white transition-all">Tất cả tin</button>
+            <button onclick="filterModerationStatus('PENDING')" data-status="PENDING" class="status-pill px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">Chờ duyệt (PENDING)</button>
+            <button onclick="filterModerationStatus('APPROVED')" data-status="APPROVED" class="status-pill px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">Đang bán (APPROVED)</button>
+            <button onclick="filterModerationStatus('IN_TRANSACTION')" data-status="IN_TRANSACTION" class="status-pill px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">Đang giao dịch</button>
+            <button onclick="filterModerationStatus('SOLD')" data-status="SOLD" class="status-pill px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">Đã bán (SOLD)</button>
+            <button onclick="filterModerationStatus('REJECTED')" data-status="REJECTED" class="status-pill px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">Đã từ chối</button>
+          </div>
+
+          <div class="relative w-72">
+            <span class="material-symbols-outlined text-[18px] text-slate-400 absolute left-3 top-1/2 -translate-y-1/2">search</span>
+            <input id="admin-search-input" oninput="renderModerationTable()" type="text" placeholder="Tìm theo tên đồ, người bán, trường..." class="w-full h-9 pl-9 pr-3 rounded-xl bg-slate-100 border border-transparent focus:border-primary focus:bg-white text-xs outline-none transition-all" />
+          </div>
+        </div>
+
+        <!-- Products Table -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <th class="py-3.5 px-4">Sản phẩm & Tình trạng</th>
+                  <th class="py-3.5 px-4">Danh mục & Trường</th>
+                  <th class="py-3.5 px-4">Giá pass</th>
+                  <th class="py-3.5 px-4">Sinh viên đăng</th>
+                  <th class="py-3.5 px-4">Trạng thái</th>
+                  <th class="py-3.5 px-4 text-right">Thao tác kiểm duyệt</th>
+                </tr>
+              </thead>
+              <tbody id="moderation-tbody" class="divide-y divide-slate-100 text-sm"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: STUDENT USERS MANAGEMENT -->
+      <section id="tab-users" class="hidden space-y-4">
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+          <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-bold text-slate-900">Danh sách Tài khoản Sinh viên & Quản trị viên</h2>
+              <p class="text-xs text-slate-500">Quản lý xác thực email sinh viên (.edu.vn) và phân quyền tài khoản</p>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <th class="py-3.5 px-4">Sinh viên</th>
+                  <th class="py-3.5 px-4">MSSV & Email</th>
+                  <th class="py-3.5 px-4">Trường & Ký túc xá</th>
+                  <th class="py-3.5 px-4">Vai trò</th>
+                  <th class="py-3.5 px-4">Xác thực SV</th>
+                  <th class="py-3.5 px-4">Trạng thái</th>
+                  <th class="py-3.5 px-4 text-right">Hành động</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody" class="divide-y divide-slate-100 text-sm"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- CUSTOM DIALOG POPUPS (REJECT REASON, CONFIRM DELETE, PRODUCT PREVIEW, LOGIN) -->
+  <!-- ========================================================================= -->
+  <div id="dialog-backdrop" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs hidden items-center justify-center p-4">
+    <div id="dialog-box" class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-modal">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div id="dialog-icon-wrap" class="w-10 h-10 rounded-xl bg-primary-light text-primary flex items-center justify-center flex-shrink-0">
+            <span id="dialog-icon" class="material-symbols-outlined text-[22px]">info</span>
+          </div>
+          <div>
+            <h3 id="dialog-title" class="text-base font-extrabold text-slate-900">Thông báo</h3>
+            <p id="dialog-subtitle" class="text-xs text-slate-500 mt-0.5">Xác nhận thao tác quản trị</p>
+          </div>
+        </div>
+        <button onclick="closeDialog()" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      </div>
+
+      <div id="dialog-body" class="mt-4 text-sm text-slate-600"></div>
+
+      <div id="dialog-actions" class="mt-6 flex items-center justify-end gap-2.5">
+        <button onclick="closeDialog()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors">
+          Hủy bỏ
+        </button>
+        <button id="dialog-confirm-btn" class="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all shadow-sm">
+          Xác nhận
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOATING TOAST NOTIFICATION -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script src="./admin.js"></script>
+</body>
+</html>
