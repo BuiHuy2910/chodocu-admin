@@ -1,688 +1,779 @@
 <!DOCTYPE html>
-<html lang="vi" class="h-full">
+<html lang="vi">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PassUni Admin — Hệ Thống Quản Trị Chợ Đồ Cũ Sinh Viên</title>
+  <title>PassUni Admin — Quản trị chợ đồ cũ sinh viên</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/admin.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-            mono: ['"JetBrains Mono"', 'monospace'],
-          },
-          colors: {
-            primary: { DEFAULT: '#006948', hover: '#005137', light: '#ECFDF5', border: '#A7F3D0' },
-            coral:   { DEFAULT: '#EA580C', light: '#FFF7ED', border: '#FED7AA' },
-            campus:  { DEFAULT: '#0284C7', light: '#F0F9FF', border: '#BAE6FD' },
-            gold:    { DEFAULT: '#D97706', light: '#FFFBEB', border: '#FDE68A' },
-            violet:  { DEFAULT: '#7C3AED', light: '#F5F3FF', border: '#DDD6FE' },
-          }
-        }
-      }
-    };
-  </script>
-  <style>
-    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #F1F5F9; color: #0F172A; }
-    .sidebar-item { @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer; }
-    .sidebar-item:hover { @apply bg-primary-light text-primary; }
-    .sidebar-item.active { @apply bg-primary text-white shadow-md; }
-    .sidebar-item.active .material-symbols-outlined { color: white; }
-    .card { @apply bg-white rounded-2xl shadow-sm border border-slate-100 p-5; }
-    .badge { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold; }
-    .btn { @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-all duration-150 cursor-pointer; }
-    .btn-primary { @apply bg-primary text-white hover:bg-primary-hover shadow-sm; }
-    .btn-danger  { @apply bg-red-500 text-white hover:bg-red-600 shadow-sm; }
-    .btn-ghost   { @apply bg-slate-100 text-slate-700 hover:bg-slate-200; }
-    .btn-success { @apply bg-emerald-500 text-white hover:bg-emerald-600; }
-    .btn-warning { @apply bg-amber-500 text-white hover:bg-amber-600; }
-    .input { @apply w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white; }
-    .section { display: none; }
-    .section.active { display: block; }
-    .modal-overlay { @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4; display:none; }
-    .modal-overlay.open { display: flex; }
-    .spin { animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .stat-card { @apply card flex items-center gap-4; }
-    .stat-icon { @apply w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0; }
-    table { @apply w-full text-sm; }
-    th  { @apply text-left text-xs font-semibold text-slate-500 uppercase tracking-wider py-3 px-4 bg-slate-50 border-b border-slate-100; }
-    td  { @apply py-3 px-4 border-b border-slate-50; }
-    tr:last-child td { @apply border-0; }
-    .toast { @apply fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-white text-sm font-medium transition-all duration-300 translate-y-24 opacity-0; }
-    .toast.show { @apply translate-y-0 opacity-100; }
-    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
-  </style>
 </head>
-<body class="h-full">
+<body>
 
-<!-- ========== TOAST ========== -->
-<div id="toast" class="toast bg-emerald-600"></div>
-
-<!-- ========== LOGIN SCREEN ========== -->
-<div id="loginScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-white to-campus/10">
-  <div class="bg-white rounded-3xl shadow-2xl p-10 w-full max-w-md">
-    <div class="text-center mb-8">
-      <div class="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-        <span class="material-symbols-outlined text-white text-3xl">storefront</span>
+<!-- ============================ LOGIN ============================ -->
+<div id="loginScreen" class="pu-login">
+  <div class="pu-login__brand">
+    <div>
+      <div class="pu-login__logo">
+        <div class="pu-login__logo-mark"><span class="material-symbols-outlined">storefront</span></div>
+        <div>
+          <div style="font-weight:700;font-size:16px;letter-spacing:-.2px">PassUni</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.6);font-weight:600">ADMIN CONSOLE</div>
+        </div>
       </div>
-      <h1 class="text-2xl font-bold text-slate-800">PassUni Admin</h1>
-      <p class="text-slate-500 mt-1 text-sm">Hệ thống quản trị chợ đồ cũ sinh viên</p>
+      <h1 class="pu-login__headline">Quản trị toàn bộ hoạt động chợ đồ cũ sinh viên</h1>
+      <p class="pu-login__desc">Duyệt bài đăng, theo dõi đơn hàng, cấu hình phí sàn theo bậc và quản lý người dùng trong một màn hình duy nhất.</p>
+
+      <div class="pu-login__points">
+        <div class="pu-login__point"><span class="material-symbols-outlined">fact_check</span><span>Duyệt / từ chối bài đăng kèm lý do, có nhật ký kiểm duyệt</span></div>
+        <div class="pu-login__point"><span class="material-symbols-outlined">payments</span><span>Chốt phí sàn theo bậc giá trị, cấu hình bên chịu phí</span></div>
+        <div class="pu-login__point"><span class="material-symbols-outlined">local_shipping</span><span>Theo dõi vòng đời đơn: chờ duyệt → giao dịch → hoàn tất / tranh chấp</span></div>
+      </div>
     </div>
-    <div class="space-y-4">
-      <div>
-        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Email quản trị</label>
-        <input id="loginEmail" type="email" class="input" placeholder="admin@chodocu.edu.vn" value="admin@chodocu.edu.vn" />
+    <div class="pu-login__foot">PassUni v3.0 — Chỉ dành cho Admin &amp; Moderator</div>
+  </div>
+
+  <div class="pu-login__panel">
+    <div>
+      <h2 class="pu-login__form-title">Đăng nhập quản trị</h2>
+      <p class="pu-login__form-sub">Sử dụng tài khoản Admin hoặc Moderator đã được cấp.</p>
+
+      <div class="pu-field">
+        <label class="t-label">Email quản trị</label>
+        <input id="loginEmail" type="email" class="pu-input" autocomplete="username" placeholder="admin@chodocu.edu.vn" value="admin@chodocu.edu.vn" />
       </div>
-      <div>
-        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Mật khẩu</label>
-        <input id="loginPassword" type="password" class="input" placeholder="••••••••" value="admin123" />
+      <div class="pu-field">
+        <label class="t-label">Mật khẩu</label>
+        <input id="loginPassword" type="password" class="pu-input" autocomplete="current-password" placeholder="••••••••" value="admin123" />
       </div>
-      <button onclick="doLogin()" class="btn btn-primary w-full justify-center py-3 text-base mt-2">
-        <span class="material-symbols-outlined text-xl">login</span>
-        Đăng nhập
+
+      <p id="loginError" class="pu-info pu-info--danger hidden" style="margin-top:14px"></p>
+
+      <button id="loginBtn" class="pu-btn pu-btn--primary pu-btn--block pu-btn--lg" style="margin-top:18px" onclick="PU.auth.login()">
+        <span class="material-symbols-outlined">login</span> Đăng nhập
       </button>
-      <p id="loginError" class="text-red-500 text-sm text-center hidden"></p>
-      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-500 leading-relaxed">
-        <div class="font-semibold text-slate-600 mb-1">Tài khoản mẫu (đã seed sẵn):</div>
-        <div>Admin: <code>admin@chodocu.edu.vn</code> / <code>admin123</code></div>
-        <div>Moderator: <code>mod@passuni.vn</code> / <code>password123</code></div>
+
+      <div class="pu-demo-box">
+        <div class="pu-demo-box__title">Tài khoản mẫu (đã seed)</div>
+        <div class="pu-demo-row"><span>Admin</span><code>admin@chodocu.edu.vn / admin123</code></div>
+        <div class="pu-demo-row"><span>Moderator</span><code>mod@passuni.vn / password123</code></div>
       </div>
     </div>
-    <p class="text-center text-xs text-slate-400 mt-6">PassUni v2.0 • Chỉ dành cho Admin & Moderator</p>
   </div>
 </div>
 
-<!-- ========== MAIN APP ========== -->
-<div id="app" class="hidden h-screen flex overflow-hidden">
+<!-- ============================ APP SHELL ============================ -->
+<div id="app" class="pu-shell">
 
-  <!-- Sidebar -->
-  <aside class="w-64 bg-white border-r border-slate-100 flex flex-col flex-shrink-0 shadow-sm">
-    <!-- Logo -->
-    <div class="p-5 border-b border-slate-100">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
-          <span class="material-symbols-outlined text-white text-lg">storefront</span>
-        </div>
+  <aside id="sidebar" class="pu-sidebar">
+    <div class="pu-sidebar__head">
+      <div class="pu-brand">
+        <div class="pu-brand__mark"><span class="material-symbols-outlined" style="font-size:20px">storefront</span></div>
         <div>
-          <div class="font-bold text-slate-800 leading-tight">PassUni</div>
-          <div class="text-xs text-primary font-semibold">Admin Panel v2</div>
+          <div class="pu-brand__name">PassUni</div>
+          <div class="pu-brand__meta">Admin v3</div>
         </div>
       </div>
     </div>
-    <!-- Admin info -->
-    <div class="p-4 border-b border-slate-100">
-      <div class="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
-        <img id="sidebarAvatar" src="https://api.dicebear.com/7.x/notionists/svg?seed=admin" class="w-9 h-9 rounded-full object-cover bg-slate-200" />
-        <div class="min-w-0">
-          <div id="sidebarName" class="text-sm font-semibold text-slate-800 truncate">Admin</div>
-          <div id="sidebarRole" class="text-xs text-primary font-medium">ADMIN</div>
-        </div>
+
+    <div class="pu-userchip">
+      <img id="sidebarAvatar" alt="" src="" onerror="this.src='https://i.pravatar.cc/80?img=12'" />
+      <div style="min-width:0">
+        <div id="sidebarName" class="pu-userchip__name truncate">Admin</div>
+        <div id="sidebarRole" class="pu-userchip__role">ADMIN</div>
       </div>
     </div>
-    <!-- Nav -->
-    <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
-      <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 py-2">Tổng quan</div>
-      <div class="sidebar-item active" onclick="switchSection('dashboard')">
-        <span class="material-symbols-outlined text-xl">dashboard</span>
-        <span>Tổng quan</span>
-      </div>
 
-      <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 py-2 mt-2">Nội dung</div>
-      <div class="sidebar-item" onclick="switchSection('pending')">
-        <span class="material-symbols-outlined text-xl">pending_actions</span>
-        <span>Duyệt bài đăng</span>
-        <span id="pendingBadge" class="ml-auto bg-coral text-white text-xs font-bold px-2 py-0.5 rounded-full hidden">0</span>
-      </div>
-      <div class="sidebar-item" onclick="switchSection('products')">
-        <span class="material-symbols-outlined text-xl">inventory_2</span>
-        <span>Quản lý sản phẩm</span>
-      </div>
-      <div class="sidebar-item" onclick="switchSection('orders')">
-        <span class="material-symbols-outlined text-xl">shopping_bag</span>
-        <span>Quản lý đơn hàng</span>
-      </div>
+    <nav class="pu-nav">
+      <div class="pu-nav__group"><span class="t-label">Tổng quan</span></div>
+      <button class="pu-nav__item is-active" data-nav="dashboard" onclick="PU.router.go('dashboard')">
+        <span class="material-symbols-outlined">dashboard</span><span>Tổng quan</span>
+      </button>
 
-      <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 py-2 mt-2">Tài chính</div>
-      <div class="sidebar-item" onclick="switchSection('financial')">
-        <span class="material-symbols-outlined text-xl">account_balance_wallet</span>
-        <span>Tài chính & Phí sàn</span>
-      </div>
+      <div class="pu-nav__group"><span class="t-label">Nội dung</span></div>
+      <button class="pu-nav__item" data-nav="pending" onclick="PU.router.go('pending')">
+        <span class="material-symbols-outlined">pending_actions</span><span>Duyệt bài đăng</span>
+        <span id="pendingBadge" class="pu-nav__count hidden">0</span>
+      </button>
+      <button class="pu-nav__item" data-nav="products" onclick="PU.router.go('products')">
+        <span class="material-symbols-outlined">inventory_2</span><span>Sản phẩm</span>
+      </button>
+      <button class="pu-nav__item" data-nav="orders" onclick="PU.router.go('orders')">
+        <span class="material-symbols-outlined">receipt_long</span><span>Đơn hàng</span>
+      </button>
 
-      <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 py-2 mt-2">Quản lý</div>
-      <div class="sidebar-item" onclick="switchSection('users')">
-        <span class="material-symbols-outlined text-xl">group</span>
-        <span>Người dùng</span>
-      </div>
-      <div class="sidebar-item" onclick="switchSection('reports')">
-        <span class="material-symbols-outlined text-xl">flag</span>
-        <span>Báo cáo vi phạm</span>
-        <span id="reportBadge" class="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full hidden">0</span>
-      </div>
-      <div class="sidebar-item" onclick="switchSection('settings')">
-        <span class="material-symbols-outlined text-xl">settings</span>
-        <span>Cài đặt hệ thống</span>
-      </div>
+      <div class="pu-nav__group"><span class="t-label">Tài chính</span></div>
+      <button class="pu-nav__item" data-nav="financial" onclick="PU.router.go('financial')">
+        <span class="material-symbols-outlined">account_balance_wallet</span><span>Tài chính &amp; phí sàn</span>
+      </button>
+
+      <div class="pu-nav__group"><span class="t-label">Quản lý</span></div>
+      <button class="pu-nav__item" data-nav="users" onclick="PU.router.go('users')">
+        <span class="material-symbols-outlined">group</span><span>Người dùng</span>
+      </button>
+      <button class="pu-nav__item" data-nav="reports" onclick="PU.router.go('reports')">
+        <span class="material-symbols-outlined">flag</span><span>Báo cáo vi phạm</span>
+        <span id="reportBadge" class="pu-nav__count is-danger hidden">0</span>
+      </button>
+      <button class="pu-nav__item" data-nav="settings" onclick="PU.router.go('settings')">
+        <span class="material-symbols-outlined">settings</span><span>Cài đặt</span>
+      </button>
     </nav>
-    <!-- Logout -->
-    <div class="p-3 border-t border-slate-100">
-      <button onclick="doLogout()" class="sidebar-item w-full text-red-500 hover:bg-red-50 hover:text-red-600">
-        <span class="material-symbols-outlined text-xl">logout</span>
-        <span>Đăng xuất</span>
+
+    <div class="pu-sidebar__foot">
+      <button class="pu-nav__item is-danger" onclick="PU.auth.logout()">
+        <span class="material-symbols-outlined">logout</span><span>Đăng xuất</span>
       </button>
     </div>
   </aside>
 
-  <!-- Main content -->
-  <main class="flex-1 overflow-y-auto">
-    <!-- Topbar -->
-    <div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 py-4 flex items-center justify-between">
-      <div>
-        <h2 id="pageTitle" class="text-xl font-bold text-slate-800">Tổng quan</h2>
-        <p id="pageSubtitle" class="text-sm text-slate-500">PassUni Admin Dashboard</p>
+  <main class="pu-main">
+    <div class="pu-topbar">
+      <button class="pu-btn pu-btn--ghost pu-btn--icon pu-burger" onclick="PU.ui.toggleSidebar()" title="Menu">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+      <div class="pu-topbar__titles">
+        <div id="pageTitle" class="pu-topbar__title">Tổng quan</div>
+        <div id="pageSubtitle" class="pu-topbar__sub">Bảng điều khiển PassUni</div>
       </div>
-      <div class="flex items-center gap-3">
-        <button onclick="refreshCurrentSection()" class="btn btn-ghost">
-          <span class="material-symbols-outlined text-lg">refresh</span>
-          Làm mới
+      <div class="pu-topbar__right">
+        <span id="lastRefresh" class="pu-topbar__time"></span>
+        <button class="pu-btn pu-btn--ghost" onclick="PU.router.reload()">
+          <span class="material-symbols-outlined">refresh</span> Làm mới
         </button>
-        <div class="text-xs text-slate-400 font-mono" id="lastRefresh"></div>
       </div>
     </div>
 
-    <div class="p-8 space-y-6">
+    <div class="pu-content">
 
-      <!-- =================== DASHBOARD =================== -->
-      <section id="section-dashboard" class="section active space-y-6">
-        <!-- Stats grid -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="stat-card">
-            <div class="stat-icon bg-campus-light"><span class="material-symbols-outlined text-campus text-2xl">group</span></div>
-            <div><div class="text-2xl font-bold text-slate-800" id="stat-students">—</div><div class="text-xs text-slate-500 mt-0.5">Sinh viên</div></div>
+      <!-- ================= DASHBOARD ================= -->
+      <section id="section-dashboard" class="pu-section is-active">
+        <div class="pu-kpis">
+          <div class="pu-kpi pu-kpi--info">
+            <div class="pu-kpi__icon"><span class="material-symbols-outlined">group</span></div>
+            <div><div class="pu-kpi__value" id="stat-students">—</div><div class="pu-kpi__label">Sinh viên</div></div>
           </div>
-          <div class="stat-card">
-            <div class="stat-icon bg-primary-light"><span class="material-symbols-outlined text-primary text-2xl">inventory_2</span></div>
-            <div><div class="text-2xl font-bold text-slate-800" id="stat-products">—</div><div class="text-xs text-slate-500 mt-0.5">Sản phẩm</div></div>
+          <div class="pu-kpi pu-kpi--brand">
+            <div class="pu-kpi__icon"><span class="material-symbols-outlined">inventory_2</span></div>
+            <div><div class="pu-kpi__value" id="stat-products">—</div><div class="pu-kpi__label">Tổng sản phẩm</div></div>
           </div>
-          <div class="stat-card">
-            <div class="stat-icon bg-coral-light"><span class="material-symbols-outlined text-coral text-2xl">pending_actions</span></div>
-            <div><div class="text-2xl font-bold text-coral" id="stat-pending">—</div><div class="text-xs text-slate-500 mt-0.5">Chờ duyệt</div></div>
+          <div class="pu-kpi pu-kpi--warn">
+            <div class="pu-kpi__icon"><span class="material-symbols-outlined">pending_actions</span></div>
+            <div><div class="pu-kpi__value" id="stat-pending">—</div><div class="pu-kpi__label">Chờ duyệt</div></div>
           </div>
-          <div class="stat-card">
-            <div class="stat-icon bg-gold-light"><span class="material-symbols-outlined text-gold text-2xl">shopping_bag</span></div>
-            <div><div class="text-2xl font-bold text-slate-800" id="stat-orders">—</div><div class="text-xs text-slate-500 mt-0.5">Tổng đơn hàng</div></div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="stat-card">
-            <div class="stat-icon bg-emerald-50"><span class="material-symbols-outlined text-emerald-600 text-2xl">check_circle</span></div>
-            <div><div class="text-2xl font-bold text-emerald-600" id="stat-approved">—</div><div class="text-xs text-slate-500 mt-0.5">Đã duyệt</div></div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon bg-violet-light"><span class="material-symbols-outlined text-violet text-2xl">sync</span></div>
-            <div><div class="text-2xl font-bold text-slate-800" id="stat-intransaction">—</div><div class="text-xs text-slate-500 mt-0.5">Đang giao dịch</div></div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon bg-slate-100"><span class="material-symbols-outlined text-slate-500 text-2xl">sell</span></div>
-            <div><div class="text-2xl font-bold text-slate-800" id="stat-sold">—</div><div class="text-xs text-slate-500 mt-0.5">Đã bán</div></div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon bg-gold-light"><span class="material-symbols-outlined text-gold text-2xl">payments</span></div>
-            <div><div class="text-lg font-bold text-gold" id="stat-revenue">—</div><div class="text-xs text-slate-500 mt-0.5">Tổng phí sàn</div></div>
+          <div class="pu-kpi">
+            <div class="pu-kpi__icon"><span class="material-symbols-outlined">receipt_long</span></div>
+            <div><div class="pu-kpi__value" id="stat-orders">—</div><div class="pu-kpi__label">Tổng đơn hàng</div></div>
           </div>
         </div>
 
-        <!-- Charts row -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div class="card">
-            <h3 class="font-semibold text-slate-700 mb-4">Phân bố sản phẩm theo danh mục</h3>
-            <canvas id="chartCategory" height="220"></canvas>
+        <div class="pu-kpis">
+          <div class="pu-kpi pu-kpi--brand">
+            <div class="pu-kpi__icon"><span class="material-symbols-outlined">check_circle</span></div>
+            <div><div class="pu-kpi__value" id="stat-approved">—</div><div class="pu-kpi__label">Bài đã duyệt</div></div>
           </div>
-          <div class="card">
-            <h3 class="font-semibold text-slate-700 mb-4">Sản phẩm theo trường / KTX</h3>
-            <canvas id="chartUniversity" height="220"></canvas>
+          <div class="pu-kpi pu-kpi--info">
+            <div class="pu-kpi__icon"><span class="material-symbols-outlined">sync_alt</span></div>
+            <div><div class="pu-kpi__value" id="stat-intransaction">—</div><div class="pu-kpi__label">Đang giao dịch</div></div>
           </div>
-        </div>
-
-        <!-- Quick actions -->
-        <div class="card">
-          <h3 class="font-semibold text-slate-700 mb-4">Thao tác nhanh</h3>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <button onclick="switchSection('pending')" class="flex flex-col items-center gap-2 p-4 bg-coral-light border border-coral-border rounded-xl hover:shadow-md transition-all">
-              <span class="material-symbols-outlined text-coral text-2xl">pending_actions</span>
-              <span class="text-xs font-semibold text-coral">Duyệt bài</span>
-            </button>
-            <button onclick="switchSection('financial')" class="flex flex-col items-center gap-2 p-4 bg-gold-light border border-gold-border rounded-xl hover:shadow-md transition-all">
-              <span class="material-symbols-outlined text-gold text-2xl">account_balance_wallet</span>
-              <span class="text-xs font-semibold text-gold">Tài chính</span>
-            </button>
-            <button onclick="switchSection('users')" class="flex flex-col items-center gap-2 p-4 bg-campus-light border border-campus-border rounded-xl hover:shadow-md transition-all">
-              <span class="material-symbols-outlined text-campus text-2xl">group</span>
-              <span class="text-xs font-semibold text-campus">Người dùng</span>
-            </button>
-            <button onclick="switchSection('reports')" class="flex flex-col items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl hover:shadow-md transition-all">
-              <span class="material-symbols-outlined text-red-500 text-2xl">flag</span>
-              <span class="text-xs font-semibold text-red-500">Báo cáo</span>
-            </button>
+          <div class="pu-kpi">
+            <div class="pu-kpi__icon"><span class="material-symbols-outlined">sell</span></div>
+            <div><div class="pu-kpi__value" id="stat-sold">—</div><div class="pu-kpi__label">Đã bán</div></div>
           </div>
-        </div>
-      </section>
-
-      <!-- =================== PENDING APPROVAL =================== -->
-      <section id="section-pending" class="section space-y-4">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 bg-coral rounded-lg flex items-center justify-center">
-              <span class="material-symbols-outlined text-white text-lg">pending_actions</span>
-            </div>
-            <div>
-              <div class="font-semibold text-slate-800">Hàng chờ duyệt bài đăng</div>
-              <div class="text-xs text-slate-500">Xem xét và duyệt/từ chối bài đăng từ sinh viên</div>
-            </div>
-          </div>
-          <button onclick="loadPending()" class="btn btn-ghost text-sm">
-            <span class="material-symbols-outlined text-lg">refresh</span> Làm mới
-          </button>
-        </div>
-        <div id="pendingGrid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          <div class="col-span-3 text-center py-12 text-slate-400">
-            <span class="material-symbols-outlined text-5xl mb-2 block spin">sync</span>
-            Đang tải...
-          </div>
-        </div>
-      </section>
-
-      <!-- =================== ALL PRODUCTS =================== -->
-      <section id="section-products" class="section space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="font-semibold text-slate-800">Tất cả sản phẩm</div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <select id="productStatusFilter" onchange="loadProducts()" class="input w-auto text-sm">
-              <option value="">Tất cả trạng thái</option>
-              <option value="PENDING">Chờ duyệt</option>
-              <option value="APPROVED">Đã duyệt</option>
-              <option value="REJECTED">Từ chối</option>
-              <option value="IN_TRANSACTION">Đang giao dịch</option>
-              <option value="SOLD">Đã bán</option>
-            </select>
-            <input id="productSearch" oninput="filterProducts()" type="text" placeholder="Tìm kiếm..." class="input w-48 text-sm" />
-          </div>
-        </div>
-        <div class="card overflow-x-auto">
-          <table id="productsTable">
-            <thead>
-              <tr>
-                <th>Sản phẩm</th>
-                <th>Người bán</th>
-                <th>Giá</th>
-                <th>Danh mục</th>
-                <th>Trạng thái</th>
-                <th>Ngày đăng</th>
-                <th class="text-center">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody id="productsBody">
-              <tr><td colspan="7" class="text-center py-8 text-slate-400">Đang tải...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- =================== ORDERS =================== -->
-      <section id="section-orders" class="section space-y-4">
-        <div class="flex items-center justify-between">
-          <div class="font-semibold text-slate-800">Quản lý đơn hàng</div>
-          <select id="orderStatusFilter" onchange="loadOrders()" class="input w-auto text-sm">
-            <option value="">Tất cả</option>
-            <option value="PENDING">Chờ người bán duyệt</option>
-            <option value="ACCEPTED">Đang giao dịch</option>
-            <option value="COMPLETED">Hoàn thành</option>
-            <option value="DISPUTED">Tranh chấp</option>
-            <option value="REJECTED">Bị từ chối</option>
-            <option value="CANCELLED">Đã huỷ</option>
-          </select>
-        </div>
-        <div class="card overflow-x-auto">
-          <table id="ordersTable">
-            <thead>
-              <tr>
-                <th>Mã đơn</th>
-                <th>Sản phẩm</th>
-                <th>Người mua</th>
-                <th>Người bán</th>
-                <th>Giá giao dịch</th>
-                <th>Phí sàn</th>
-                <th>Người bán nhận</th>
-                <th>Trạng thái</th>
-                <th>Ngày tạo</th>
-                <th class="text-center">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody id="ordersBody">
-              <tr><td colspan="10" class="text-center py-8 text-slate-400">Đang tải...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- =================== FINANCIAL =================== -->
-      <section id="section-financial" class="section space-y-6">
-        <!-- Summary cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div class="stat-card border-l-4 border-gold">
-            <div class="stat-icon bg-gold-light"><span class="material-symbols-outlined text-gold text-2xl">payments</span></div>
-            <div><div class="text-xl font-bold text-gold" id="fin-totalFee">—</div><div class="text-xs text-slate-500 mt-0.5">Tổng phí sàn thu</div></div>
-          </div>
-          <div class="stat-card border-l-4 border-primary">
-            <div class="stat-icon bg-primary-light"><span class="material-symbols-outlined text-primary text-2xl">account_balance</span></div>
-            <div><div class="text-xl font-bold text-primary" id="fin-totalValue">—</div><div class="text-xs text-slate-500 mt-0.5">Tổng giá trị giao dịch</div></div>
-          </div>
-          <div class="stat-card border-l-4 border-campus">
-            <div class="stat-icon bg-campus-light"><span class="material-symbols-outlined text-campus text-2xl">done_all</span></div>
-            <div><div class="text-xl font-bold text-campus" id="fin-totalCompleted">—</div><div class="text-xs text-slate-500 mt-0.5">Đơn hoàn thành</div></div>
+          <div class="pu-kpi pu-kpi--warn">
+            <div class="pu-kpi__icon"><span class="material-symbols-outlined">payments</span></div>
+            <div><div class="pu-kpi__value" id="stat-revenue">—</div><div class="pu-kpi__label">Tổng phí sàn thu</div></div>
           </div>
         </div>
 
-        <!-- Fee Config Card -->
-        <div class="card">
-          <div class="flex items-center gap-3 mb-5">
-            <div class="w-8 h-8 bg-gold rounded-lg flex items-center justify-center">
-              <span class="material-symbols-outlined text-white text-lg">tune</span>
-            </div>
-            <div>
-              <div class="font-semibold text-slate-800">Cấu hình phí sàn</div>
-              <div class="text-xs text-slate-500">Admin điều chỉnh tỷ lệ và giới hạn phí</div>
-            </div>
-            <span id="feeStatusBadge" class="ml-auto badge bg-emerald-100 text-emerald-700">● Đang thu phí</span>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-5">
-            <div>
-              <label class="text-xs font-semibold text-slate-500 mb-1 block">Tỷ lệ phí sàn (%)</label>
-              <div class="flex gap-2">
-                <input id="feeRate" type="number" min="0" max="30" step="0.5" class="input" placeholder="5" />
-                <button onclick="updateSetting('platform_fee_rate', (parseFloat(document.getElementById('feeRate').value)/100).toString())" class="btn btn-primary text-xs px-3">Lưu</button>
+        <div class="pu-grid-2">
+          <div class="pu-card">
+            <div class="pu-card__head pu-card__head--plain">
+              <div>
+                <div class="pu-card__title">Phân bố theo danh mục</div>
+                <div class="pu-card__sub">Số lượng tin đăng mỗi danh mục</div>
               </div>
-              <p class="text-xs text-slate-400 mt-1">Hiện tại: <span id="curFeeRate" class="font-semibold text-primary">—</span></p>
             </div>
-            <div>
-              <label class="text-xs font-semibold text-slate-500 mb-1 block">Phí tối thiểu (VNĐ)</label>
-              <div class="flex gap-2">
-                <input id="minFee" type="number" min="0" step="500" class="input" placeholder="2000" />
-                <button onclick="updateSetting('min_platform_fee', document.getElementById('minFee').value)" class="btn btn-primary text-xs px-3">Lưu</button>
+            <div class="pu-card__body"><div class="pu-chart-wrap"><canvas id="chartCategory"></canvas></div></div>
+          </div>
+          <div class="pu-card">
+            <div class="pu-card__head pu-card__head--plain">
+              <div>
+                <div class="pu-card__title">Phân bố theo trường / KTX</div>
+                <div class="pu-card__sub">Số lượng tin đăng mỗi khu vực</div>
               </div>
-              <p class="text-xs text-slate-400 mt-1">Hiện tại: <span id="curMinFee" class="font-semibold text-primary">—</span></p>
             </div>
-            <div>
-              <label class="text-xs font-semibold text-slate-500 mb-1 block">Phí tối đa (VNĐ)</label>
-              <div class="flex gap-2">
-                <input id="maxFee" type="number" min="0" step="1000" class="input" placeholder="50000" />
-                <button onclick="updateSetting('max_platform_fee', document.getElementById('maxFee').value)" class="btn btn-primary text-xs px-3">Lưu</button>
-              </div>
-              <p class="text-xs text-slate-400 mt-1">Hiện tại: <span id="curMaxFee" class="font-semibold text-primary">—</span></p>
-            </div>
-            <div>
-              <label class="text-xs font-semibold text-slate-500 mb-1 block">Trạng thái thu phí</label>
-              <button id="toggleFeeBtn" onclick="toggleFee()" class="btn btn-success w-full justify-center">
-                <span class="material-symbols-outlined text-lg">toggle_on</span>
-                Bật / Tắt phí
+            <div class="pu-card__body"><div class="pu-chart-wrap"><canvas id="chartUniversity"></canvas></div></div>
+          </div>
+        </div>
+
+        <div class="pu-card">
+          <div class="pu-card__head pu-card__head--plain">
+            <div><div class="pu-card__title">Thao tác nhanh</div><div class="pu-card__sub">Đi thẳng tới việc cần làm</div></div>
+          </div>
+          <div class="pu-card__body">
+            <div class="pu-grid-3">
+              <button class="pu-btn pu-btn--ghost pu-btn--lg pu-btn--block" onclick="PU.router.go('pending')">
+                <span class="material-symbols-outlined">pending_actions</span> Duyệt bài chờ
               </button>
-              <p class="text-xs text-slate-400 mt-1">Tắt = miễn phí sàn hoàn toàn</p>
-            </div>
-            <div>
-              <label class="text-xs font-semibold text-slate-500 mb-1 block">Bên chịu phí sàn</label>
-              <select id="feePayer" class="input">
-                <option value="SELLER">Người bán chịu phí</option>
-                <option value="BUYER">Người mua chịu phí</option>
-                <option value="SPLIT">Chia đôi (50/50)</option>
-              </select>
-              <button onclick="updateSetting('fee_payer', document.getElementById('feePayer').value)" class="btn btn-primary w-full justify-center text-xs mt-2">Lưu bên chịu phí</button>
+              <button class="pu-btn pu-btn--ghost pu-btn--lg pu-btn--block" onclick="PU.router.go('orders')">
+                <span class="material-symbols-outlined">receipt_long</span> Xử lý đơn hàng
+              </button>
+              <button class="pu-btn pu-btn--ghost pu-btn--lg pu-btn--block" onclick="PU.router.go('financial')">
+                <span class="material-symbols-outlined">tune</span> Cấu hình phí sàn
+              </button>
             </div>
           </div>
-          <!-- Fee preview -->
-          <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
-            <div class="text-xs font-semibold text-slate-500 mb-2">Ví dụ tính phí với cấu hình hiện tại:</div>
-            <div class="flex gap-6 text-sm flex-wrap">
-              <div>Giao dịch <strong>50,000đ</strong> → Phí: <span id="preview50k" class="text-gold font-semibold">—</span> | Người bán nhận: <span id="preview50kSeller" class="text-primary font-semibold">—</span></div>
-              <div>Giao dịch <strong>500,000đ</strong> → Phí: <span id="preview500k" class="text-gold font-semibold">—</span> | Người bán nhận: <span id="preview500kSeller" class="text-primary font-semibold">—</span></div>
-              <div>Giao dịch <strong>2,000,000đ</strong> → Phí: <span id="preview2m" class="text-gold font-semibold">—</span> | Người bán nhận: <span id="preview2mSeller" class="text-primary font-semibold">—</span></div>
+        </div>
+      </section>
+
+      <!-- ================= PENDING ================= -->
+      <section id="section-pending" class="pu-section">
+        <div class="pu-card pu-card--flush">
+          <div class="pu-card__head">
+            <div>
+              <div class="pu-card__title">Hàng chờ duyệt</div>
+              <div class="pu-card__sub">Bài đăng của sinh viên đang chờ kiểm duyệt</div>
+            </div>
+            <div class="pu-card__actions">
+              <button class="pu-btn pu-btn--ghost pu-btn--sm" onclick="PU.pending.load()">
+                <span class="material-symbols-outlined">refresh</span> Tải lại
+              </button>
+            </div>
+          </div>
+          <div class="pu-card__body">
+            <div id="pendingGrid" class="pu-grid-auto"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= PRODUCTS ================= -->
+      <section id="section-products" class="pu-section">
+        <div class="pu-card pu-card--flush">
+          <div class="pu-card__head">
+            <div>
+              <div class="pu-card__title">Tất cả sản phẩm</div>
+              <div class="pu-card__sub">Tìm kiếm, lọc trạng thái và thao tác trên từng tin</div>
+            </div>
+            <div class="pu-toolbar">
+              <div class="pu-search">
+                <span class="material-symbols-outlined">search</span>
+                <input id="productSearch" class="pu-input" placeholder="Tên, người bán, danh mục…" oninput="PU.products.filter()" />
+              </div>
+              <select id="productStatusFilter" class="pu-select" style="width:auto" onchange="PU.products.load()">
+                <option value="">Tất cả trạng thái</option>
+                <option value="PENDING">Chờ duyệt</option>
+                <option value="APPROVED">Đã duyệt</option>
+                <option value="REJECTED">Từ chối</option>
+                <option value="IN_TRANSACTION">Đang giao dịch</option>
+                <option value="SOLD">Đã bán</option>
+                <option value="HIDDEN">Đang ẩn</option>
+              </select>
+              <button class="pu-btn pu-btn--ghost pu-btn--sm" onclick="PU.products.openLogs()">
+                <span class="material-symbols-outlined">history</span> Nhật ký duyệt
+              </button>
+            </div>
+          </div>
+          <div class="pu-table-wrap">
+            <table class="pu-table">
+              <thead>
+                <tr>
+                  <th>Sản phẩm</th>
+                  <th>Người bán</th>
+                  <th class="is-right">Giá</th>
+                  <th>Danh mục</th>
+                  <th>Trạng thái</th>
+                  <th>Ngày đăng</th>
+                  <th class="is-center">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="productsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= ORDERS ================= -->
+      <section id="section-orders" class="pu-section">
+        <div class="pu-card pu-card--flush">
+          <div class="pu-card__head">
+            <div>
+              <div class="pu-card__title">Quản lý đơn hàng</div>
+              <div class="pu-card__sub">Phí sàn được chốt tại thời điểm tạo đơn</div>
+            </div>
+            <div class="pu-toolbar">
+              <select id="orderStatusFilter" class="pu-select" style="width:auto" onchange="PU.orders.load()">
+                <option value="">Tất cả trạng thái</option>
+                <option value="PENDING">Chờ người bán duyệt</option>
+                <option value="ACCEPTED">Đang giao dịch</option>
+                <option value="COMPLETED">Hoàn thành</option>
+                <option value="DISPUTED">Tranh chấp</option>
+                <option value="REJECTED">Bị từ chối</option>
+                <option value="CANCELLED">Đã huỷ</option>
+              </select>
+              <button class="pu-btn pu-btn--ghost pu-btn--sm" onclick="PU.orders.load()">
+                <span class="material-symbols-outlined">refresh</span> Tải lại
+              </button>
+            </div>
+          </div>
+          <div class="pu-table-wrap">
+            <table class="pu-table">
+              <thead>
+                <tr>
+                  <th>Mã đơn</th>
+                  <th>Sản phẩm</th>
+                  <th>Người mua</th>
+                  <th>Người bán</th>
+                  <th class="is-right">Giá GD</th>
+                  <th class="is-right">Phí sàn</th>
+                  <th class="is-right">Người bán nhận</th>
+                  <th>Trạng thái</th>
+                  <th class="is-center">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="ordersBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= FINANCIAL ================= -->
+      <section id="section-financial" class="pu-section">
+        <div class="pu-grid-3">
+          <div class="pu-kpi pu-kpi--warn">
+            <div class="pu-kpi__icon"><span class="material-symbols-outlined">payments</span></div>
+            <div><div class="pu-kpi__value" id="fin-totalFee">—</div><div class="pu-kpi__label">Tổng phí sàn thu</div></div>
+          </div>
+          <div class="pu-kpi pu-kpi--brand">
+            <div class="pu-kpi__icon"><span class="material-symbols-outlined">account_balance</span></div>
+            <div><div class="pu-kpi__value" id="fin-totalValue">—</div><div class="pu-kpi__label">Tổng giá trị giao dịch</div></div>
+          </div>
+          <div class="pu-kpi pu-kpi--info">
+            <div class="pu-kpi__icon"><span class="material-symbols-outlined">done_all</span></div>
+            <div><div class="pu-kpi__value" id="fin-totalCompleted">—</div><div class="pu-kpi__label">Đơn hoàn thành</div></div>
+          </div>
+        </div>
+
+        <div class="pu-card">
+          <div class="pu-card__head">
+            <div>
+              <div class="pu-card__title">Cấu hình phí sàn</div>
+              <div class="pu-card__sub">Tỷ lệ cơ bản, giới hạn phí và bên chịu phí</div>
+            </div>
+            <div class="pu-card__actions">
+              <span id="feeStatusBadge" class="pu-badge pu-badge--ok">Đang thu phí</span>
+            </div>
+          </div>
+          <div class="pu-card__body">
+            <div class="pu-grid-3" style="gap:14px">
+              <div>
+                <label class="t-label">Tỷ lệ cơ bản (%)</label>
+                <div class="pu-inline" style="margin-top:5px">
+                  <input id="feeRate" type="number" min="0" max="30" step="0.5" class="pu-input" placeholder="5" />
+                  <button class="pu-btn pu-btn--primary pu-btn--sm" onclick="PU.financial.saveRate()">Lưu</button>
+                </div>
+                <p class="t-caption" style="margin-top:5px">Hiện tại: <b id="curFeeRate">—</b></p>
+              </div>
+              <div>
+                <label class="t-label">Phí tối thiểu (VNĐ)</label>
+                <div class="pu-inline" style="margin-top:5px">
+                  <input id="minFee" type="number" min="0" step="500" class="pu-input" placeholder="2000" />
+                  <button class="pu-btn pu-btn--primary pu-btn--sm" onclick="PU.financial.saveSetting('min_platform_fee','minFee')">Lưu</button>
+                </div>
+                <p class="t-caption" style="margin-top:5px">Hiện tại: <b id="curMinFee">—</b></p>
+              </div>
+              <div>
+                <label class="t-label">Phí tối đa (VNĐ)</label>
+                <div class="pu-inline" style="margin-top:5px">
+                  <input id="maxFee" type="number" min="0" step="1000" class="pu-input" placeholder="50000" />
+                  <button class="pu-btn pu-btn--primary pu-btn--sm" onclick="PU.financial.saveSetting('max_platform_fee','maxFee')">Lưu</button>
+                </div>
+                <p class="t-caption" style="margin-top:5px">Hiện tại: <b id="curMaxFee">—</b></p>
+              </div>
+            </div>
+
+            <div class="pu-grid-2" style="margin-top:14px">
+              <div>
+                <label class="t-label">Bên chịu phí sàn</label>
+                <div class="pu-inline" style="margin-top:5px">
+                  <select id="feePayer" class="pu-select">
+                    <option value="SELLER">Người bán chịu phí</option>
+                    <option value="BUYER">Người mua chịu phí</option>
+                    <option value="SPLIT">Chia đôi 50/50</option>
+                  </select>
+                  <button class="pu-btn pu-btn--primary pu-btn--sm" onclick="PU.financial.saveSetting('fee_payer','feePayer')">Lưu</button>
+                </div>
+                <p class="t-caption" style="margin-top:5px">Áp dụng cho các đơn tạo mới.</p>
+              </div>
+              <div>
+                <label class="t-label">Trạng thái thu phí</label>
+                <div class="pu-inline" style="margin-top:5px">
+                  <button class="pu-btn pu-btn--warn pu-btn--block" onclick="PU.financial.toggleFee()">
+                    <span class="material-symbols-outlined">toggle_on</span> Bật / Tắt thu phí
+                  </button>
+                </div>
+                <p class="t-caption" style="margin-top:5px">Tắt = miễn phí sàn hoàn toàn.</p>
+              </div>
+            </div>
+
+            <div style="margin-top:16px;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px">
+              <div class="t-label" style="margin-bottom:6px">Mô phỏng với cấu hình hiện tại</div>
+              <div class="pu-grid-3" style="gap:8px">
+                <div class="t-body">50.000đ → phí <b id="preview50k">—</b> · bán nhận <b id="preview50kSeller">—</b></div>
+                <div class="t-body">500.000đ → phí <b id="preview500k">—</b> · bán nhận <b id="preview500kSeller">—</b></div>
+                <div class="t-body">2.000.000đ → phí <b id="preview2m">—</b> · bán nhận <b id="preview2mSeller">—</b></div>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Fee tiers -->
-        <div class="card">
-          <div class="flex items-center justify-between mb-4">
+        <div class="pu-card pu-card--flush">
+          <div class="pu-card__head">
             <div>
-              <div class="font-semibold text-slate-800">Bậc phí theo giá trị đơn</div>
-              <div class="text-xs text-slate-500">Áp dụng thay cho tỷ lệ cơ bản khi đơn khớp khoảng giá trị</div>
+              <div class="pu-card__title">Bậc phí theo giá trị đơn</div>
+              <div class="pu-card__sub">Bậc khớp khoảng giá sẽ thay thế tỷ lệ cơ bản</div>
             </div>
-            <button onclick="openTierModal()" class="btn btn-primary text-xs">
-              <span class="material-symbols-outlined text-sm">add</span> Thêm bậc
-            </button>
+            <div class="pu-card__actions">
+              <button class="pu-btn pu-btn--primary pu-btn--sm" onclick="PU.financial.openTier()">
+                <span class="material-symbols-outlined">add</span> Thêm bậc
+              </button>
+            </div>
           </div>
-          <div class="overflow-x-auto">
-            <table>
+          <div class="pu-table-wrap">
+            <table class="pu-table">
               <thead>
                 <tr>
                   <th>Tên bậc</th>
-                  <th>Từ (VNĐ)</th>
-                  <th>Đến (VNĐ)</th>
-                  <th>Tỷ lệ phí</th>
-                  <th>Ưu tiên</th>
+                  <th class="is-right">Từ</th>
+                  <th class="is-right">Đến</th>
+                  <th class="is-right">Tỷ lệ</th>
+                  <th class="is-right">Ưu tiên</th>
                   <th>Trạng thái</th>
-                  <th class="text-center">Thao tác</th>
+                  <th class="is-center">Thao tác</th>
                 </tr>
               </thead>
-              <tbody id="feeTiersBody">
-                <tr><td colspan="7" class="text-center py-8 text-slate-400">Đang tải...</td></tr>
-              </tbody>
+              <tbody id="feeTiersBody"></tbody>
             </table>
           </div>
         </div>
 
-        <!-- Transaction history -->
-        <div class="card">
-          <div class="font-semibold text-slate-700 mb-4">Lịch sử giao dịch gần đây</div>
-          <div class="overflow-x-auto">
-            <table>
+        <div class="pu-card pu-card--flush">
+          <div class="pu-card__head">
+            <div><div class="pu-card__title">Giao dịch gần đây</div><div class="pu-card__sub">Sinh ra khi đơn chuyển sang Hoàn thành</div></div>
+          </div>
+          <div class="pu-table-wrap">
+            <table class="pu-table">
               <thead>
                 <tr>
                   <th>#</th>
                   <th>Sản phẩm</th>
                   <th>Người mua</th>
                   <th>Người bán</th>
-                  <th>Giá GD</th>
-                  <th>Tỷ lệ phí</th>
-                  <th>Phí sàn</th>
-                  <th>Người bán nhận</th>
+                  <th class="is-right">Giá GD</th>
+                  <th class="is-right">Tỷ lệ</th>
+                  <th class="is-right">Phí sàn</th>
+                  <th class="is-right">Người bán nhận</th>
                   <th>Thời gian</th>
                 </tr>
               </thead>
-              <tbody id="transactionBody">
-                <tr><td colspan="9" class="text-center py-8 text-slate-400">Đang tải...</td></tr>
-              </tbody>
+              <tbody id="transactionBody"></tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <!-- =================== USERS =================== -->
-      <section id="section-users" class="section space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="font-semibold text-slate-800">Quản lý người dùng</div>
-          <div class="flex items-center gap-2">
-            <select id="userRoleFilter" onchange="filterUsers()" class="input w-auto text-sm">
-              <option value="">Tất cả</option>
-              <option value="STUDENT">Sinh viên</option>
-              <option value="MODERATOR">Moderator</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-            <input id="userSearch" oninput="filterUsers()" type="text" placeholder="Tìm tên, email..." class="input w-48 text-sm" />
+      <!-- ================= USERS ================= -->
+      <section id="section-users" class="pu-section">
+        <div class="pu-card pu-card--flush">
+          <div class="pu-card__head">
+            <div><div class="pu-card__title">Người dùng</div><div class="pu-card__sub">Khóa/mở khóa, xác thực sinh viên và phân quyền</div></div>
+            <div class="pu-toolbar">
+              <div class="pu-search">
+                <span class="material-symbols-outlined">search</span>
+                <input id="userSearch" class="pu-input" placeholder="Tên hoặc email…" oninput="PU.users.filter()" />
+              </div>
+              <select id="userRoleFilter" class="pu-select" style="width:auto" onchange="PU.users.filter()">
+                <option value="">Tất cả vai trò</option>
+                <option value="STUDENT">Sinh viên</option>
+                <option value="MODERATOR">Moderator</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
           </div>
-        </div>
-        <div class="card overflow-x-auto">
-          <table>
-            <thead>
-              <tr>
-                <th>Người dùng</th>
-                <th>Email</th>
-                <th>Mã SV</th>
-                <th>Trường</th>
-                <th>Role</th>
-                <th>Xác thực</th>
-                <th>Rating</th>
-                <th>Deals</th>
-                <th class="text-center">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody id="usersBody">
-              <tr><td colspan="9" class="text-center py-8 text-slate-400">Đang tải...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- =================== REPORTS =================== -->
-      <section id="section-reports" class="section space-y-4">
-        <div class="flex items-center justify-between">
-          <div class="font-semibold text-slate-800">Báo cáo vi phạm</div>
-          <select id="reportStatusFilter" onchange="loadReports()" class="input w-auto text-sm">
-            <option value="ALL">Tất cả</option>
-            <option value="PENDING">Chờ xử lý</option>
-            <option value="RESOLVED">Đã xử lý</option>
-            <option value="DISMISSED">Bác bỏ</option>
-          </select>
-        </div>
-        <div class="card overflow-x-auto">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Người báo cáo</th>
-                <th>Sản phẩm bị báo</th>
-                <th>Lý do</th>
-                <th>Chi tiết</th>
-                <th>Trạng thái</th>
-                <th>Ngày báo cáo</th>
-                <th class="text-center">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody id="reportsBody">
-              <tr><td colspan="8" class="text-center py-8 text-slate-400">Đang tải...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- =================== SETTINGS =================== -->
-      <section id="section-settings" class="section space-y-4">
-        <div class="font-semibold text-slate-800">Cài đặt hệ thống</div>
-        <div class="card">
-          <div class="text-sm text-slate-500 mb-4">Toàn bộ cấu hình hệ thống. Thay đổi có hiệu lực ngay lập tức.</div>
-          <div id="settingsList" class="space-y-3">
-            <div class="text-center py-8 text-slate-400">Đang tải...</div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="font-semibold text-slate-700 mb-4">Thông tin kết nối Supabase</div>
-          <div class="space-y-2 text-sm font-mono text-slate-600 bg-slate-50 p-4 rounded-xl">
-            <div><span class="text-slate-400">URL:</span> https://ovxnlepmewindufcgxln.supabase.co</div>
-            <div><span class="text-slate-400">API:</span> http://localhost:8080/api</div>
-            <div><span class="text-slate-400">Status:</span> <span id="connStatus" class="text-emerald-600 font-semibold">● Đang kiểm tra...</span></div>
+          <div class="pu-table-wrap">
+            <table class="pu-table">
+              <thead>
+                <tr>
+                  <th>Người dùng</th>
+                  <th>Email</th>
+                  <th>Mã SV</th>
+                  <th>Trường</th>
+                  <th>Vai trò</th>
+                  <th>Xác thực</th>
+                  <th class="is-right">Đánh giá</th>
+                  <th class="is-right">Deals</th>
+                  <th class="is-center">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="usersBody"></tbody>
+            </table>
           </div>
         </div>
       </section>
 
-    </div><!-- /p-8 -->
+      <!-- ================= REPORTS ================= -->
+      <section id="section-reports" class="pu-section">
+        <div class="pu-card pu-card--flush">
+          <div class="pu-card__head">
+            <div><div class="pu-card__title">Báo cáo vi phạm</div><div class="pu-card__sub">Xem xét và xử lý báo cáo từ sinh viên</div></div>
+            <div class="pu-toolbar">
+              <select id="reportStatusFilter" class="pu-select" style="width:auto" onchange="PU.reports.load()">
+                <option value="ALL">Tất cả</option>
+                <option value="PENDING">Chờ xử lý</option>
+                <option value="RESOLVED">Đã xử lý</option>
+                <option value="DISMISSED">Bác bỏ</option>
+              </select>
+              <button class="pu-btn pu-btn--ghost pu-btn--sm" onclick="PU.reports.load()">
+                <span class="material-symbols-outlined">refresh</span> Tải lại
+              </button>
+            </div>
+          </div>
+          <div class="pu-table-wrap">
+            <table class="pu-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Người báo cáo</th>
+                  <th>Sản phẩm</th>
+                  <th>Lý do</th>
+                  <th>Chi tiết</th>
+                  <th>Trạng thái</th>
+                  <th>Ngày</th>
+                  <th class="is-center">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="reportsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= SETTINGS ================= -->
+      <section id="section-settings" class="pu-section">
+        <div class="pu-card">
+          <div class="pu-card__head pu-card__head--plain">
+            <div><div class="pu-card__title">Cấu hình hệ thống</div><div class="pu-card__sub">Thay đổi có hiệu lực ngay với các đơn / bài đăng mới</div></div>
+          </div>
+          <div class="pu-card__body">
+            <div id="settingsList"></div>
+          </div>
+        </div>
+
+        <div class="pu-card">
+          <div class="pu-card__head pu-card__head--plain">
+            <div><div class="pu-card__title">Kết nối</div><div class="pu-card__sub">Thông tin môi trường đang sử dụng</div></div>
+          </div>
+          <div class="pu-card__body">
+            <div class="pu-grid-3" style="gap:8px">
+              <div class="pu-detail__item"><div class="t-label">API base</div><div class="mono t-body truncate" id="connApi">—</div></div>
+              <div class="pu-detail__item"><div class="t-label">Supabase URL</div><div class="mono t-body truncate" id="connSupabase">—</div></div>
+              <div class="pu-detail__item"><div class="t-label">Trạng thái</div><div id="connStatus" class="t-body">Đang kiểm tra…</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
   </main>
-</div><!-- /app -->
-
-<!-- ========== REJECT MODAL ========== -->
-<div id="rejectModal" class="modal-overlay">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-    <h3 class="font-bold text-lg text-slate-800 mb-1">Từ chối tin đăng</h3>
-    <p class="text-sm text-slate-500 mb-4">Vui lòng nhập lý do từ chối để thông báo cho người đăng.</p>
-    <input type="hidden" id="rejectProductId" />
-    <textarea id="rejectReason" class="input h-24 resize-none" placeholder="VD: Hình ảnh không rõ ràng, mô tả thiếu thông tin, vi phạm quy chuẩn..."></textarea>
-    <div class="flex gap-3 mt-4 justify-end">
-      <button onclick="closeModal('rejectModal')" class="btn btn-ghost">Huỷ</button>
-      <button onclick="confirmReject()" class="btn btn-danger">
-        <span class="material-symbols-outlined text-lg">block</span> Từ chối
-      </button>
-    </div>
-  </div>
 </div>
 
-<!-- ========== RESOLVE REPORT MODAL ========== -->
-<div id="resolveModal" class="modal-overlay">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-    <h3 class="font-bold text-lg text-slate-800 mb-1">Xử lý báo cáo</h3>
-    <input type="hidden" id="resolveReportId" />
-    <textarea id="resolveNote" class="input h-20 resize-none mb-4" placeholder="Ghi chú hành động xử lý..."></textarea>
-    <div class="flex gap-3 justify-end">
-      <button onclick="closeModal('resolveModal')" class="btn btn-ghost">Huỷ</button>
-      <button onclick="resolveReport('DISMISSED')" class="btn btn-ghost text-slate-600">Bác bỏ</button>
-      <button onclick="resolveReport('RESOLVED')" class="btn btn-success">Xử lý xong</button>
-    </div>
-  </div>
-</div>
-
-<!-- ========== FEE TIER MODAL ========== -->
-<div id="tierModal" class="modal-overlay">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-    <h3 class="font-bold text-lg text-slate-800 mb-1">Bậc phí sàn</h3>
-    <p class="text-sm text-slate-500 mb-4">Đơn trong khoảng [Từ, Đến] sẽ áp dụng tỷ lệ phí này.</p>
-    <input type="hidden" id="tierId" />
-    <div class="grid grid-cols-2 gap-3">
-      <div class="col-span-2">
-        <label class="text-xs font-semibold text-slate-500 mb-1 block">Tên bậc</label>
-        <input id="tierName" class="input" placeholder="VD: Đơn nhỏ (< 100.000đ)" />
-      </div>
+<!-- ============================ MODALS ============================ -->
+<div id="rejectModal" class="pu-modal">
+  <div class="pu-modal__backdrop" onclick="PU.ui.closeModal('rejectModal')"></div>
+  <div class="pu-modal__panel">
+    <div class="pu-modal__head">
       <div>
-        <label class="text-xs font-semibold text-slate-500 mb-1 block">Từ (VNĐ)</label>
-        <input id="tierMin" type="number" min="0" step="1000" class="input" placeholder="0" />
+        <div class="pu-modal__title">Từ chối tin đăng</div>
+        <div class="pu-modal__sub">Lý do sẽ được gửi tới người đăng</div>
       </div>
-      <div>
-        <label class="text-xs font-semibold text-slate-500 mb-1 block">Đến (VNĐ, trống = ∞)</label>
-        <input id="tierMax" type="number" min="0" step="1000" class="input" placeholder="100000" />
-      </div>
-      <div>
-        <label class="text-xs font-semibold text-slate-500 mb-1 block">Tỷ lệ phí (%)</label>
-        <input id="tierRate" type="number" min="0" max="100" step="0.5" class="input" placeholder="3" />
-      </div>
-      <div>
-        <label class="text-xs font-semibold text-slate-500 mb-1 block">Ưu tiên (số lớn trước)</label>
-        <input id="tierPriority" type="number" min="0" step="1" class="input" placeholder="10" />
-      </div>
-    </div>
-    <div class="flex gap-3 mt-5 justify-end">
-      <button onclick="closeModal('tierModal')" class="btn btn-ghost">Huỷ</button>
-      <button onclick="saveTier()" class="btn btn-primary">Lưu bậc phí</button>
-    </div>
-  </div>
-</div>
-
-<!-- ========== PRODUCT DETAIL MODAL ========== -->
-<div id="productModal" class="modal-overlay">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-    <div class="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-      <h3 class="font-bold text-slate-800">Chi tiết sản phẩm</h3>
-      <button onclick="closeModal('productModal')" class="btn btn-ghost p-2">
+      <button class="pu-btn pu-btn--ghost pu-btn--icon pu-modal__close" onclick="PU.ui.closeModal('rejectModal')">
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
-    <div id="productModalContent" class="p-6"></div>
+    <div class="pu-modal__body">
+      <input type="hidden" id="rejectProductId" />
+      <label class="t-label">Lý do từ chối</label>
+      <textarea id="rejectReason" class="pu-textarea" style="margin-top:5px" rows="4" placeholder="VD: Ảnh mờ, mô tả thiếu thông tin, giá không hợp lý…"></textarea>
+    </div>
+    <div class="pu-modal__foot">
+      <button class="pu-btn pu-btn--ghost" onclick="PU.ui.closeModal('rejectModal')">Huỷ</button>
+      <button class="pu-btn pu-btn--danger" onclick="PU.pending.confirmReject()">
+        <span class="material-symbols-outlined">block</span> Từ chối
+      </button>
+    </div>
   </div>
 </div>
 
-<script src="admin.js"></script>
+<div id="resolveModal" class="pu-modal">
+  <div class="pu-modal__backdrop" onclick="PU.ui.closeModal('resolveModal')"></div>
+  <div class="pu-modal__panel">
+    <div class="pu-modal__head">
+      <div>
+        <div class="pu-modal__title">Xử lý báo cáo</div>
+        <div class="pu-modal__sub">Ghi chú hành động để lưu vết</div>
+      </div>
+      <button class="pu-btn pu-btn--ghost pu-btn--icon pu-modal__close" onclick="PU.ui.closeModal('resolveModal')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="pu-modal__body">
+      <input type="hidden" id="resolveReportId" />
+      <label class="t-label">Ghi chú</label>
+      <textarea id="resolveNote" class="pu-textarea" style="margin-top:5px" rows="3" placeholder="VD: Đã ẩn bài và nhắc nhở người bán…"></textarea>
+    </div>
+    <div class="pu-modal__foot">
+      <button class="pu-btn pu-btn--ghost" onclick="PU.ui.closeModal('resolveModal')">Huỷ</button>
+      <button class="pu-btn pu-btn--ghost" onclick="PU.reports.resolve('DISMISSED')">Bác bỏ</button>
+      <button class="pu-btn pu-btn--primary" onclick="PU.reports.resolve('RESOLVED')">Xử lý xong</button>
+    </div>
+  </div>
+</div>
+
+<div id="tierModal" class="pu-modal">
+  <div class="pu-modal__backdrop" onclick="PU.ui.closeModal('tierModal')"></div>
+  <div class="pu-modal__panel">
+    <div class="pu-modal__head">
+      <div>
+        <div class="pu-modal__title">Bậc phí sàn</div>
+        <div class="pu-modal__sub">Đơn trong khoảng [Từ, Đến] sẽ áp dụng tỷ lệ này</div>
+      </div>
+      <button class="pu-btn pu-btn--ghost pu-btn--icon pu-modal__close" onclick="PU.ui.closeModal('tierModal')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="pu-modal__body">
+      <input type="hidden" id="tierId" />
+      <div class="pu-form-grid">
+        <div class="pu-span-2">
+          <label class="t-label">Tên bậc</label>
+          <input id="tierName" class="pu-input" style="margin-top:5px" placeholder="VD: Đơn nhỏ (< 100.000đ)" />
+        </div>
+        <div>
+          <label class="t-label">Từ (VNĐ)</label>
+          <input id="tierMin" type="number" min="0" step="1000" class="pu-input" style="margin-top:5px" placeholder="0" />
+        </div>
+        <div>
+          <label class="t-label">Đến (VNĐ, trống = ∞)</label>
+          <input id="tierMax" type="number" min="0" step="1000" class="pu-input" style="margin-top:5px" placeholder="100000" />
+        </div>
+        <div>
+          <label class="t-label">Tỷ lệ phí (%)</label>
+          <input id="tierRate" type="number" min="0" max="100" step="0.5" class="pu-input" style="margin-top:5px" placeholder="3" />
+        </div>
+        <div>
+          <label class="t-label">Ưu tiên (số lớn trước)</label>
+          <input id="tierPriority" type="number" min="0" step="1" class="pu-input" style="margin-top:5px" placeholder="10" />
+        </div>
+      </div>
+    </div>
+    <div class="pu-modal__foot">
+      <button class="pu-btn pu-btn--ghost" onclick="PU.ui.closeModal('tierModal')">Huỷ</button>
+      <button class="pu-btn pu-btn--primary" onclick="PU.financial.saveTier()">Lưu bậc phí</button>
+    </div>
+  </div>
+</div>
+
+<div id="productModal" class="pu-modal">
+  <div class="pu-modal__backdrop" onclick="PU.ui.closeModal('productModal')"></div>
+  <div class="pu-modal__panel pu-modal__panel--lg">
+    <div class="pu-modal__head">
+      <div>
+        <div class="pu-modal__title">Chi tiết sản phẩm</div>
+        <div class="pu-modal__sub">Thông tin đầy đủ để ra quyết định duyệt</div>
+      </div>
+      <button class="pu-btn pu-btn--ghost pu-btn--icon pu-modal__close" onclick="PU.ui.closeModal('productModal')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="pu-modal__body" id="productModalContent"></div>
+  </div>
+</div>
+
+<div id="logsModal" class="pu-modal">
+  <div class="pu-modal__backdrop" onclick="PU.ui.closeModal('logsModal')"></div>
+  <div class="pu-modal__panel pu-modal__panel--lg">
+    <div class="pu-modal__head">
+      <div>
+        <div class="pu-modal__title">Nhật ký kiểm duyệt</div>
+        <div class="pu-modal__sub">Ai duyệt / ẩn bài, lý do và thời điểm</div>
+      </div>
+      <button class="pu-btn pu-btn--ghost pu-btn--icon pu-modal__close" onclick="PU.ui.closeModal('logsModal')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="pu-modal__body" style="padding:0"><div id="logsContent"></div></div>
+  </div>
+</div>
+
+<div id="noteModal" class="pu-modal">
+  <div class="pu-modal__backdrop" onclick="PU.ui.closeModal('noteModal')"></div>
+  <div class="pu-modal__panel">
+    <div class="pu-modal__head">
+      <div>
+        <div class="pu-modal__title" id="noteTitle">Ghi chú</div>
+        <div class="pu-modal__sub">Không bắt buộc — dùng để lưu vết xử lý</div>
+      </div>
+      <button class="pu-btn pu-btn--ghost pu-btn--icon pu-modal__close" onclick="PU.ui.closeModal('noteModal')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="pu-modal__body">
+      <textarea id="noteInput" class="pu-textarea" rows="3" placeholder="Nhập ghi chú…"></textarea>
+    </div>
+    <div class="pu-modal__foot">
+      <button class="pu-btn pu-btn--ghost" onclick="PU.ui.closeModal('noteModal')">Huỷ</button>
+      <button class="pu-btn pu-btn--primary" id="noteConfirm">Xác nhận</button>
+    </div>
+  </div>
+</div>
+
+<div id="confirmModal" class="pu-modal">
+  <div class="pu-modal__backdrop" onclick="PU.ui.closeModal('confirmModal')"></div>
+  <div class="pu-modal__panel" style="width:min(430px,calc(100vw - 32px))">
+    <div class="pu-modal__head">
+      <div>
+        <div class="pu-modal__title" id="confirmTitle">Xác nhận</div>
+        <div class="pu-modal__sub" id="confirmDesc"></div>
+      </div>
+    </div>
+    <div class="pu-modal__foot">
+      <button class="pu-btn pu-btn--ghost" onclick="PU.ui.closeModal('confirmModal')">Huỷ</button>
+      <button class="pu-btn pu-btn--danger" id="confirmOk">Đồng ý</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" class="pu-toasts"></div>
+
+<!-- ============================ SCRIPTS ============================ -->
+<script src="js/config.js"></script>
+<script src="js/core/http.js"></script>
+<script src="js/core/ui.js"></script>
+<script src="js/core/auth.js"></script>
+<script src="js/core/router.js"></script>
+<script src="js/modules/dashboard.js"></script>
+<script src="js/modules/pending.js"></script>
+<script src="js/modules/products.js"></script>
+<script src="js/modules/orders.js"></script>
+<script src="js/modules/financial.js"></script>
+<script src="js/modules/users.js"></script>
+<script src="js/modules/reports.js"></script>
+<script src="js/modules/settings.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
