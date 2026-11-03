@@ -1,800 +1,891 @@
+// =============================================================================
+// PassUni Admin JS v2.0
+// Không có dữ liệu fix cứng — tất cả lấy từ API backend
+// =============================================================================
+
 const API_BASE = 'http://localhost:8080/api';
 let adminToken = localStorage.getItem('passuni_admin_token') || '';
+let currentUserRole = localStorage.getItem('passuni_admin_role') || '';
+let currentSection = 'dashboard';
 let allProducts = [];
 let allUsers = [];
-let currentStatusFilter = 'ALL';
+let chartCategory = null;
+let chartUniversity = null;
+let financialData = null;
 
-// Fallback data when backend is starting or offline
-const FALLBACK_PRODUCTS = [
-  {
-    id: 9,
-    title: 'Máy tính bỏ túi Casio fx-580VN X chính hãng Bitex',
-    description: 'Máy tính quốc dân cho sinh viên kỹ thuật giải hệ phương trình, ma trận, tích phân siêu nhanh. Còn tem chống giả Bitex.',
-    price: 280000,
-    originalPrice: 650000,
-    conditionLabel: 'Như mới (95-99%)',
-    conditionNote: 'Mới 96% • Còn tem Bitex',
-    passReason: 'Học xong môn / Qua môn',
-    pickupSpot: 'Sảnh thư viện H1 - ĐH Bách Khoa',
-    status: 'PENDING',
-    categoryName: 'Giáo trình & Sách',
-    universityShortName: 'ĐH Bách Khoa',
-    createdAt: '19/10/2026 21:15',
-    imageUrls: ['https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=800&auto=format&fit=crop&q=80'],
-    seller: { id: 3, fullName: 'Lê Hoàng Yến', email: 'hoangyen@hcmut.edu.vn', studentId: '2014512', verifiedStudent: true }
-  },
-  {
-    id: 10,
-    title: 'Bàn phím cơ không dây Keychron K6 Red Switch (Pass nhanh)',
-    description: 'Bàn phím cơ nhỏ gọn 65% kết nối Bluetooth 3 thiết bị, gõ code cực êm không gây ồn cho bạn cùng phòng KTX.',
-    price: 550000,
-    originalPrice: 1450000,
-    conditionLabel: 'Như mới (95-99%)',
-    conditionNote: 'Mới 95% • Pin trâu 2 tuần',
-    passReason: 'Lên đời đồ mới',
-    pickupSpot: 'Sảnh Tòa A - ĐH CNTT (UIT)',
-    status: 'PENDING',
-    categoryName: 'Đồ điện & Quạt',
-    universityShortName: 'ĐH CNTT - UIT',
-    createdAt: '19/10/2026 21:30',
-    imageUrls: ['https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=800&auto=format&fit=crop&q=80'],
-    seller: { id: 4, fullName: 'Trần Hoàng Phúc', email: 'hoangphuc@uit.edu.vn', studentId: '21520399', verifiedStudent: true }
-  },
-  {
-    id: 1,
-    title: 'Bộ Bàn Ghế Học Gấp Gọn Kèm Giá Đỡ Sách Thông Minh',
-    description: 'Dùng đúng 1 học kỳ ôn thi đại cương, giữ kỹ hầu như không trầy xước. Khung chân kim loại chịu lực tốt.',
-    price: 110000,
-    originalPrice: 280000,
-    conditionLabel: 'Như mới (95-99%)',
-    conditionNote: 'Mới 95% • Dọn phòng về quê',
-    passReason: 'Dọn phòng KTX / Chuyển trọ',
-    pickupSpot: 'Căng tin Tòa BA1 - KTX Khu B',
-    status: 'APPROVED',
-    categoryName: 'Đồ dùng & Bàn',
-    universityShortName: 'KTX Khu B',
-    createdAt: '19/10/2026 19:20',
-    imageUrls: ['https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?w=800&auto=format&fit=crop&q=80'],
-    seller: { id: 3, fullName: 'Lê Hoàng Yến', email: 'hoangyen@hcmut.edu.vn', studentId: '2014512', verifiedStudent: true }
-  },
-  {
-    id: 2,
-    title: 'Quạt đứng Senko lồng sắt 3 tốc độ chạy êm',
-    description: 'Quạt Senko chính hãng mua đầu năm, motor đồng chạy cực êm.',
-    price: 120000,
-    originalPrice: 290000,
-    conditionLabel: 'Tốt (80-90%)',
-    conditionNote: 'Mới 90% • Pass gấp trong chiều',
-    passReason: 'Ra trường / Tốt nghiệp',
-    pickupSpot: 'Sảnh Tòa H1 - ĐH Bách Khoa',
-    status: 'APPROVED',
-    categoryName: 'Đồ điện & Quạt',
-    universityShortName: 'ĐH Bách Khoa',
-    createdAt: '19/10/2026 18:10',
-    imageUrls: ['https://images.unsplash.com/photo-1618941716939-553df3c6c278?w=800&auto=format&fit=crop&q=80'],
-    seller: { id: 3, fullName: 'Lê Hoàng Yến', email: 'hoangyen@hcmut.edu.vn', studentId: '2014512', verifiedStudent: true }
-  },
-  {
-    id: 3,
-    title: 'Combo Giáo trình Giải tích 1 & 2 + Đại số Tuyến tính',
-    description: 'Trọn bộ giáo trình Giải tích 1, 2 và Đại số tuyến tính chuẩn ĐHQG. Tặng kèm tập đề thi mẫu.',
-    price: 35000,
-    originalPrice: 95000,
-    conditionLabel: 'Như mới (95-99%)',
-    conditionNote: 'Sách đẹp • Tặng kèm đề thi',
-    passReason: 'Học xong môn / Qua môn',
-    pickupSpot: 'Thư viện Trung tâm ĐH Tự Nhiên',
-    status: 'APPROVED',
-    categoryName: 'Giáo trình & Sách',
-    universityShortName: 'ĐH Tự Nhiên',
-    createdAt: '19/10/2026 16:45',
-    imageUrls: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&auto=format&fit=crop&q=80'],
-    seller: { id: 5, fullName: 'Phạm Ngọc Ánh', email: 'ngocanh@hcmus.edu.vn', studentId: '22110088', verifiedStudent: true }
-  },
-  {
-    id: 4,
-    title: 'Nồi lẩu mini Bear 1.2L đa năng kèm xửng hấp inox',
-    description: 'Nồi lẩu điện mini Bear màu xanh mint siêu xinh, lòng nồi chống dính vân đá.',
-    price: 110000,
-    originalPrice: 250000,
-    conditionLabel: 'Như mới (95-99%)',
-    conditionNote: 'Mới 98% • Đủ hộp',
-    passReason: 'Lên đời đồ mới',
-    pickupSpot: 'Sảnh Tòa C2 - KTX Khu B',
-    status: 'IN_TRANSACTION',
-    categoryName: 'Đồ điện & Quạt',
-    universityShortName: 'KTX Khu B',
-    createdAt: '19/10/2026 15:00',
-    imageUrls: ['https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?w=800&auto=format&fit=crop&q=80'],
-    seller: { id: 4, fullName: 'Trần Hoàng Phúc', email: 'hoangphuc@uit.edu.vn', studentId: '21520399', verifiedStudent: true }
-  }
-];
-
-const FALLBACK_USERS = [
-  { id: 1, fullName: 'Ban Quản Trị PassUni', email: 'admin@chodocu.edu.vn', studentId: 'ADMIN01', universityShortName: 'KTX Khu B', dormArea: 'Trung tâm Quản lý KTX', role: 'ADMIN', verifiedStudent: true, active: true, completedDeals: 99 },
-  { id: 2, fullName: 'Nguyễn Minh Thư', email: 'minhthu@student.vnuhcm.edu.vn', studentId: '21120501', universityShortName: 'KTX Khu B', dormArea: 'Tòa BA1 - KTX Khu B', role: 'STUDENT', verifiedStudent: true, active: true, completedDeals: 12 },
-  { id: 3, fullName: 'Lê Hoàng Yến', email: 'hoangyen@hcmut.edu.vn', studentId: '2014512', universityShortName: 'ĐH Bách Khoa', dormArea: 'Tòa BA1 - KTX Khu B', role: 'STUDENT', verifiedStudent: true, active: true, completedDeals: 24 },
-  { id: 4, fullName: 'Trần Hoàng Phúc', email: 'hoangphuc@uit.edu.vn', studentId: '21520399', universityShortName: 'ĐH CNTT - UIT', dormArea: 'Tòa C2 - KTX Khu B', role: 'STUDENT', verifiedStudent: true, active: true, completedDeals: 9 },
-  { id: 5, fullName: 'Phạm Ngọc Ánh', email: 'ngocanh@hcmus.edu.vn', studentId: '22110088', universityShortName: 'ĐH Tự Nhiên', dormArea: 'Tòa D5 - KTX Khu A', role: 'STUDENT', verifiedStudent: true, active: true, completedDeals: 15 }
-];
-
-function formatVND(amount) {
-  return Number(amount || 0).toLocaleString('vi-VN') + ' đ';
+// =============================================================================
+// UTILITY
+// =============================================================================
+function fmt(n) {
+  if (!n && n !== 0) return '—';
+  return new Intl.NumberFormat('vi-VN').format(n) + 'đ';
+}
+function fmtNum(n) {
+  if (!n && n !== 0) return '—';
+  return new Intl.NumberFormat('vi-VN').format(n);
+}
+function fmtPct(v) {
+  if (!v && v !== 0) return '—';
+  return (parseFloat(v) * 100).toFixed(1) + '%';
 }
 
-function showToast(message, type = 'success') {
-  const container = document.getElementById('toast-container');
-  const toast = document.createElement('div');
-  const isError = type === 'error';
-  toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg border text-xs font-bold animate-modal ${
-    isError ? 'bg-red-950 text-white border-red-800' : 'bg-slate-900 text-white border-slate-700'
-  }`;
-  toast.innerHTML = `
-    <span class="material-symbols-outlined text-[18px] ${isError ? 'text-red-400' : 'text-emerald-400'}">
-      ${isError ? 'error' : 'check_circle'}
-    </span>
-    <span>${message}</span>
-  `;
-  container.appendChild(toast);
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transition = 'opacity 0.25s ease';
-    setTimeout(() => toast.remove(), 250);
-  }, 3000);
-}
-
-function openDialog({ title, subtitle, icon = 'info', iconClass = 'bg-primary-light text-primary', bodyHtml, confirmText = 'Xác nhận', confirmClass = 'bg-primary hover:bg-primary-hover text-white', onConfirm }) {
-  document.getElementById('dialog-title').textContent = title;
-  document.getElementById('dialog-subtitle').textContent = subtitle || '';
-  document.getElementById('dialog-icon').textContent = icon;
-  document.getElementById('dialog-icon-wrap').className = `w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconClass}`;
-  document.getElementById('dialog-body').innerHTML = bodyHtml;
-
-  const confirmBtn = document.getElementById('dialog-confirm-btn');
-  confirmBtn.textContent = confirmText;
-  confirmBtn.className = `px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${confirmClass}`;
-  confirmBtn.onclick = () => {
-    if (onConfirm) onConfirm();
+function statusBadge(status) {
+  const map = {
+    PENDING:        '<span class="badge bg-amber-100 text-amber-700">⏳ Chờ duyệt</span>',
+    APPROVED:       '<span class="badge bg-emerald-100 text-emerald-700">✅ Đã duyệt</span>',
+    REJECTED:       '<span class="badge bg-red-100 text-red-700">❌ Từ chối</span>',
+    IN_TRANSACTION: '<span class="badge bg-violet-100 text-violet-700">🔄 Giao dịch</span>',
+    SOLD:           '<span class="badge bg-slate-100 text-slate-600">💰 Đã bán</span>',
+    HIDDEN:         '<span class="badge bg-slate-100 text-slate-500">🙈 Ẩn</span>',
+    ACCEPTED:       '<span class="badge bg-campus-light text-campus">✔ Đã xác nhận</span>',
+    IN_PROGRESS:    '<span class="badge bg-violet-100 text-violet-700">🚚 Đang giao</span>',
+    COMPLETED:      '<span class="badge bg-emerald-100 text-emerald-700">🎉 Hoàn thành</span>',
+    CANCELLED:      '<span class="badge bg-red-100 text-red-700">🚫 Đã huỷ</span>',
+    DISPUTED:       '<span class="badge bg-orange-100 text-orange-700">⚠️ Tranh chấp</span>',
   };
-
-  const backdrop = document.getElementById('dialog-backdrop');
-  backdrop.classList.remove('hidden');
-  backdrop.classList.add('flex');
+  return map[status] || `<span class="badge bg-slate-100 text-slate-600">${status}</span>`;
 }
 
-function closeDialog() {
-  const backdrop = document.getElementById('dialog-backdrop');
-  backdrop.classList.remove('flex');
-  backdrop.classList.add('hidden');
-}
-
-function switchTab(tab) {
-  ['dashboard', 'moderation', 'users'].forEach(t => {
-    document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab);
-    const navBtn = document.getElementById(`nav-${t}`);
-    if (t === tab) {
-      navBtn.className = 'nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all bg-primary text-white shadow-sm';
-    } else {
-      navBtn.className = 'nav-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-all';
-    }
-  });
-
-  const titles = {
-    dashboard: 'Tổng quan Hệ thống Chợ Đồ Cũ Sinh Viên',
-    moderation: 'Kiểm duyệt & Quản lý Tin đăng Sản phẩm',
-    users: 'Quản lý Tài khoản Sinh viên (.edu.vn)'
+function roleBadge(role) {
+  const map = {
+    ADMIN:     '<span class="badge bg-red-100 text-red-700">👑 Admin</span>',
+    MODERATOR: '<span class="badge bg-violet-100 text-violet-700">🛡 Mod</span>',
+    STUDENT:   '<span class="badge bg-campus-light text-campus">🎓 Sinh viên</span>',
   };
-  document.getElementById('page-title').textContent = titles[tab] || 'PassUni Admin';
+  return map[role] || `<span class="badge bg-slate-100 text-slate-600">${role || '—'}</span>`;
 }
 
-async function ensureAdminAuth() {
-  if (adminToken) return adminToken;
+function reportStatusBadge(s) {
+  const map = {
+    PENDING:   '<span class="badge bg-amber-100 text-amber-700">⏳ Chờ xử lý</span>',
+    RESOLVED:  '<span class="badge bg-emerald-100 text-emerald-700">✅ Đã xử lý</span>',
+    DISMISSED: '<span class="badge bg-slate-100 text-slate-500">🚫 Bác bỏ</span>',
+  };
+  return map[s] || `<span class="badge bg-slate-100 text-slate-600">${s}</span>`;
+}
+
+function showToast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.className = `toast show ${type === 'error' ? 'bg-red-600' : type === 'warn' ? 'bg-amber-500' : 'bg-emerald-600'}`;
+  el.textContent = msg;
+  setTimeout(() => { el.className = 'toast bg-emerald-600'; }, 3000);
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+
+// =============================================================================
+// AUTH
+// =============================================================================
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.classList.add('hidden');
+
   try {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@chodocu.edu.vn', password: 'admin123' })
+      body: JSON.stringify({ email, password: pass })
     });
-    if (res.ok) {
-      const json = await res.json();
-      if (json.data && json.data.accessToken) {
-        adminToken = json.data.accessToken;
-        localStorage.setItem('passuni_admin_token', adminToken);
-        return adminToken;
-      }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Sai email hoặc mật khẩu');
+
+    const user = data.data || data;
+    const token = user.accessToken || user.token;
+    const role  = user.user?.role || user.role || '';
+
+    if (!['ADMIN', 'MODERATOR'].includes(role)) {
+      throw new Error('Bạn không có quyền truy cập trang quản trị.');
     }
-  } catch (_) {}
-  return '';
+
+    adminToken = token;
+    currentUserRole = role;
+    localStorage.setItem('passuni_admin_token', token);
+    localStorage.setItem('passuni_admin_role', role);
+
+    document.getElementById('sidebarName').textContent = user.user?.fullName || email;
+    document.getElementById('sidebarRole').textContent = role;
+    if (user.user?.avatarUrl) {
+      document.getElementById('sidebarAvatar').src = user.user.avatarUrl;
+    }
+
+    // Hide settings-only items for MODERATOR
+    if (role === 'MODERATOR') {
+      document.querySelectorAll('[onclick*="settings"], [onclick*="financial"]').forEach(el => {
+        // keep financial visible for moderators, hide settings tab for non-admin is optional
+      });
+    }
+
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    await loadDashboard();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.remove('hidden');
+  }
 }
 
-async function refreshAllData(showNotification = false) {
-  await ensureAdminAuth();
+function doLogout() {
+  adminToken = '';
+  currentUserRole = '';
+  localStorage.removeItem('passuni_admin_token');
+  localStorage.removeItem('passuni_admin_role');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+}
+
+// Auto-restore session
+if (adminToken) {
+  fetch(`${API_BASE}/auth/profile`, { headers: { Authorization: `Bearer ${adminToken}` } })
+    .then(r => r.json())
+    .then(data => {
+      const user = data.data || data;
+      const role = user.role || '';
+      if (['ADMIN', 'MODERATOR'].includes(role)) {
+        document.getElementById('sidebarName').textContent = user.fullName || 'Admin';
+        document.getElementById('sidebarRole').textContent = role;
+        if (user.avatarUrl) document.getElementById('sidebarAvatar').src = user.avatarUrl;
+        currentUserRole = role;
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        loadDashboard();
+      } else { doLogout(); }
+    })
+    .catch(() => doLogout());
+}
+
+// =============================================================================
+// API HELPER
+// =============================================================================
+async function api(path, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${adminToken}`,
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${API_BASE}${path}`, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Lỗi server');
+  return data.data !== undefined ? data.data : data;
+}
+
+// =============================================================================
+// NAVIGATION
+// =============================================================================
+function switchSection(name) {
+  currentSection = name;
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+  document.getElementById(`section-${name}`).classList.add('active');
+  document.querySelectorAll(`.sidebar-item[onclick*="'${name}'"]`).forEach(el => el.classList.add('active'));
+
+  const titles = {
+    dashboard: ['Tổng quan', 'PassUni Admin Dashboard'],
+    pending:   ['Duyệt bài đăng', 'Hàng chờ phê duyệt từ sinh viên'],
+    products:  ['Quản lý sản phẩm', 'Toàn bộ sản phẩm trên sàn'],
+    orders:    ['Quản lý đơn hàng', 'Theo dõi giao dịch mua bán'],
+    financial: ['Tài chính & Phí sàn', 'Doanh thu và cấu hình phí'],
+    users:     ['Người dùng', 'Quản lý tài khoản sinh viên'],
+    reports:   ['Báo cáo vi phạm', 'Xem xét và xử lý báo cáo'],
+    settings:  ['Cài đặt hệ thống', 'Cấu hình toàn hệ thống'],
+  };
+  const [title, sub] = titles[name] || ['—', ''];
+  document.getElementById('pageTitle').textContent = title;
+  document.getElementById('pageSubtitle').textContent = sub;
+  document.getElementById('lastRefresh').textContent = new Date().toLocaleTimeString('vi-VN');
+
+  const loaders = { dashboard: loadDashboard, pending: loadPending, products: loadProducts, orders: loadOrders, financial: loadFinancial, users: loadUsers, reports: loadReports, settings: loadSettings };
+  if (loaders[name]) loaders[name]();
+}
+
+function refreshCurrentSection() { switchSection(currentSection); }
+
+// =============================================================================
+// DASHBOARD
+// =============================================================================
+async function loadDashboard() {
   try {
-    const headers = adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {};
-    const [prodRes, userRes] = await Promise.all([
-      fetch(`${API_BASE}/admin/products`, { headers }),
-      fetch(`${API_BASE}/admin/users`, { headers })
+    const [stats, fin] = await Promise.all([
+      api('/admin/stats'),
+      api('/admin/financial').catch(() => null)
     ]);
 
-    if (prodRes.ok && userRes.ok) {
-      const prodJson = await prodRes.json();
-      const userJson = await userRes.json();
-      allProducts = prodJson.data || [];
-      allUsers = userJson.data || [];
-      document.getElementById('connection-badge').innerHTML = `
-        <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-        <span>Backend & Supabase Connected</span>
-      `;
-      if (showNotification) showToast('Đã đồng bộ dữ liệu trực tiếp từ Backend & Supabase!');
-    } else {
-      throw new Error('Fallback mode');
-    }
-  } catch (_) {
-    if (allProducts.length === 0) allProducts = [...FALLBACK_PRODUCTS];
-    if (allUsers.length === 0) allUsers = [...FALLBACK_USERS];
-    if (showNotification) showToast('Đang hiển thị dữ liệu đồng bộ cục bộ (Chế độ Demo)', 'success');
-  }
+    document.getElementById('stat-students').textContent     = fmtNum(stats.totalStudents);
+    document.getElementById('stat-products').textContent     = fmtNum(stats.totalProducts);
+    document.getElementById('stat-pending').textContent      = fmtNum(stats.pendingProducts);
+    document.getElementById('stat-orders').textContent       = fmtNum(stats.totalOrders);
+    document.getElementById('stat-approved').textContent     = fmtNum(stats.approvedProducts);
+    document.getElementById('stat-intransaction').textContent = fmtNum(stats.inTransactionProducts);
+    document.getElementById('stat-sold').textContent         = fmtNum(stats.soldProducts);
+    document.getElementById('stat-revenue').textContent      = fin ? fmt(fin.totalPlatformFees) : '—';
 
-  renderDashboard();
-  renderModerationTable();
-  renderUsersTable();
+    // Update badges
+    if (stats.pendingProducts > 0) {
+      document.getElementById('pendingBadge').textContent = stats.pendingProducts;
+      document.getElementById('pendingBadge').classList.remove('hidden');
+    }
+
+    // Charts
+    renderCategoryChart(stats.productsByCategory || {});
+    renderUniversityChart(stats.productsByUniversity || {});
+  } catch (err) {
+    showToast('Không thể tải thống kê: ' + err.message, 'error');
+  }
 }
 
-function renderDashboard() {
-  const pendingCount = allProducts.filter(p => p.status === 'PENDING').length;
-  const approvedCount = allProducts.filter(p => p.status === 'APPROVED').length;
-  const soldCount = allProducts.filter(p => p.status === 'SOLD' || p.status === 'IN_TRANSACTION').length;
-  const studentCount = allUsers.filter(u => u.role === 'STUDENT').length;
-  const totalValue = allProducts.reduce((sum, p) => sum + Number(p.price || 0), 0);
-
-  document.getElementById('stat-total-products').textContent = allProducts.length;
-  document.getElementById('stat-approved-products').textContent = `${approvedCount} đang hiển thị`;
-  document.getElementById('stat-sold-products').textContent = `${soldCount} đang giao dịch/đã bán`;
-  document.getElementById('stat-pending-products').textContent = pendingCount;
-  document.getElementById('stat-total-students').textContent = studentCount;
-  document.getElementById('stat-total-value').textContent = formatVND(totalValue);
-  document.getElementById('stat-total-orders').textContent = allProducts.length + 4;
-
-  document.getElementById('badge-pending').textContent = pendingCount;
-  document.getElementById('badge-users').textContent = allUsers.length;
-
-  // Render Category Bars
-  const catCounts = {};
-  allProducts.forEach(p => {
-    const c = p.categoryName || 'Khác';
-    catCounts[c] = (catCounts[c] || 0) + 1;
+function renderCategoryChart(data) {
+  const ctx = document.getElementById('chartCategory').getContext('2d');
+  if (chartCategory) chartCategory.destroy();
+  const colors = ['#006948','#EA580C','#0284C7','#D97706','#7C3AED','#E11D48','#059669','#0EA5E9'];
+  chartCategory = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(data),
+      datasets: [{ data: Object.values(data), backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } }
   });
-  const catContainer = document.getElementById('chart-categories');
-  catContainer.innerHTML = Object.entries(catCounts).map(([name, count]) => {
-    const pct = Math.max(12, Math.round((count / Math.max(1, allProducts.length)) * 100));
-    return `
-      <div>
-        <div class="flex items-center justify-between text-xs mb-1">
-          <span class="font-semibold text-slate-700">${name}</span>
-          <span class="font-bold text-slate-900 tabular-nums">${count} tin (${pct}%)</span>
-        </div>
-        <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-          <div class="h-full rounded-full bg-primary transition-all duration-500" style="width: ${pct}%"></div>
-        </div>
-      </div>
-    `;
-  }).join('');
+}
 
-  // Render University Bars
-  const uniCounts = {};
-  allProducts.forEach(p => {
-    const u = p.universityShortName || 'KTX Khu B';
-    uniCounts[u] = (uniCounts[u] || 0) + 1;
+function renderUniversityChart(data) {
+  const ctx = document.getElementById('chartUniversity').getContext('2d');
+  if (chartUniversity) chartUniversity.destroy();
+  chartUniversity = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(data),
+      datasets: [{ label: 'Sản phẩm', data: Object.values(data), backgroundColor: '#006948cc', borderRadius: 8 }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
   });
-  const uniContainer = document.getElementById('chart-universities');
-  uniContainer.innerHTML = Object.entries(uniCounts).map(([name, count]) => {
-    const pct = Math.max(12, Math.round((count / Math.max(1, allProducts.length)) * 100));
-    return `
-      <div>
-        <div class="flex items-center justify-between text-xs mb-1">
-          <span class="font-semibold text-slate-700">${name}</span>
-          <span class="font-bold text-campus tabular-nums">${count} tin</span>
-        </div>
-        <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-          <div class="h-full rounded-full bg-campus transition-all duration-500" style="width: ${pct}%"></div>
-        </div>
-      </div>
-    `;
-  }).join('');
+}
 
-  // Render Quick Pending Queue
-  const pendingItems = allProducts.filter(p => p.status === 'PENDING').slice(0, 3);
-  const pendingContainer = document.getElementById('quick-pending-list');
-  if (pendingItems.length === 0) {
-    pendingContainer.innerHTML = `
-      <div class="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 text-center">
-        <span class="material-symbols-outlined text-primary text-[24px]">task_alt</span>
-        <p class="text-xs font-bold text-primary mt-1">Tất cả tin đăng đã được kiểm duyệt!</p>
-      </div>
-    `;
-  } else {
-    pendingContainer.innerHTML = pendingItems.map(p => `
-      <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2.5">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <img src="${(p.imageUrls && p.imageUrls[0]) || ''}" alt="${p.title}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0 bg-slate-200" />
-          <div class="min-w-0">
-            <p class="text-xs font-bold text-slate-900 truncate">${p.title}</p>
-            <p class="text-[11px] text-slate-500 truncate">${p.seller?.fullName || 'Sinh viên'} • <span class="text-primary font-bold">${formatVND(p.price)}</span></p>
+// =============================================================================
+// PENDING APPROVAL
+// =============================================================================
+async function loadPending() {
+  const grid = document.getElementById('pendingGrid');
+  grid.innerHTML = '<div class="col-span-3 text-center py-12 text-slate-400"><span class="material-symbols-outlined text-5xl mb-2 block spin">sync</span>Đang tải hàng chờ duyệt...</div>';
+  try {
+    const products = await api('/admin/products?status=PENDING');
+    if (!products || products.length === 0) {
+      grid.innerHTML = '<div class="col-span-3 text-center py-16 text-slate-400"><span class="material-symbols-outlined text-6xl block mb-3 text-emerald-300">task_alt</span><div class="font-semibold">Tất cả đã được duyệt!</div><div class="text-sm mt-1">Không còn bài nào chờ duyệt.</div></div>';
+      return;
+    }
+    grid.innerHTML = products.map(p => `
+      <div class="card hover:shadow-md transition-shadow flex flex-col gap-3">
+        <div class="relative">
+          <img src="${p.imageUrls?.[0] || 'https://via.placeholder.com/400x220?text=No+Image'}"
+               onerror="this.src='https://via.placeholder.com/400x220?text=No+Image'"
+               class="w-full h-44 object-cover rounded-xl bg-slate-100" />
+          ${p.isUrgent ? '<span class="absolute top-2 left-2 badge bg-coral text-white">🔥 Gấp</span>' : ''}
+        </div>
+        <div class="flex-1">
+          <div class="font-semibold text-slate-800 line-clamp-2 text-sm leading-snug">${p.title}</div>
+          <div class="text-xs text-slate-500 mt-1">${p.description ? p.description.substring(0, 100) + '...' : ''}</div>
+          <div class="mt-2 flex items-center justify-between">
+            <div class="font-bold text-primary">${fmt(p.price)}</div>
+            <div class="text-xs text-slate-400 line-through">${p.originalPrice ? fmt(p.originalPrice) : ''}</div>
           </div>
+          <div class="mt-2 grid grid-cols-2 gap-1 text-xs text-slate-500">
+            <div class="flex items-center gap-1"><span class="material-symbols-outlined text-xs">person</span>${p.seller?.fullName || '—'}</div>
+            <div class="flex items-center gap-1"><span class="material-symbols-outlined text-xs">school</span>${p.universityShortName || p.university?.shortName || '—'}</div>
+            <div class="flex items-center gap-1"><span class="material-symbols-outlined text-xs">category</span>${p.categoryName || p.category?.name || '—'}</div>
+            <div class="flex items-center gap-1"><span class="material-symbols-outlined text-xs">sell</span>${p.itemCondition || '—'}</div>
+          </div>
+          ${p.pickupSpot ? `<div class="text-xs text-slate-500 mt-1 flex items-center gap-1"><span class="material-symbols-outlined text-xs">location_on</span>${p.pickupSpot}</div>` : ''}
         </div>
-        <div class="flex items-center gap-1 flex-shrink-0">
-          <button onclick="approveProduct(${p.id})" title="Duyệt tin" class="w-7 h-7 rounded-lg bg-primary text-white flex items-center justify-center hover:bg-primary-hover transition-colors">
-            <span class="material-symbols-outlined text-[16px]">check</span>
+        <div class="flex gap-2 pt-2 border-t border-slate-100">
+          <button onclick="viewProduct(${p.id})" class="btn btn-ghost flex-1 text-xs py-1.5 justify-center">
+            <span class="material-symbols-outlined text-sm">visibility</span> Xem
           </button>
-          <button onclick="promptRejectProduct(${p.id})" title="Từ chối" class="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition-colors">
-            <span class="material-symbols-outlined text-[16px]">close</span>
+          <button onclick="approveProduct(${p.id})" class="btn btn-success flex-1 text-xs py-1.5 justify-center">
+            <span class="material-symbols-outlined text-sm">check_circle</span> Duyệt
+          </button>
+          <button onclick="openRejectModal(${p.id})" class="btn btn-danger flex-1 text-xs py-1.5 justify-center">
+            <span class="material-symbols-outlined text-sm">block</span> Từ chối
           </button>
         </div>
       </div>
     `).join('');
+    // Update badge
+    document.getElementById('pendingBadge').textContent = products.length;
+    document.getElementById('pendingBadge').classList.remove('hidden');
+  } catch (err) {
+    grid.innerHTML = `<div class="col-span-3 text-center py-12 text-red-400">Lỗi: ${err.message}</div>`;
   }
-}
-
-function filterModerationStatus(status) {
-  currentStatusFilter = status;
-  document.querySelectorAll('.status-pill').forEach(btn => {
-    if (btn.dataset.status === status) {
-      btn.className = 'status-pill px-3 py-1.5 rounded-xl text-xs font-bold bg-primary text-white transition-all';
-    } else {
-      btn.className = 'status-pill px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all';
-    }
-  });
-  renderModerationTable();
-}
-
-function getStatusBadgeHtml(status) {
-  switch (status) {
-    case 'PENDING':
-      return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-coral-light text-coral border border-coral-border"><span class="w-1.5 h-1.5 rounded-full bg-coral animate-ping"></span>Chờ duyệt</span>`;
-    case 'APPROVED':
-      return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-primary-light text-primary border border-primary-border"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span>Đang bán</span>`;
-    case 'IN_TRANSACTION':
-      return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-campus-light text-campus border border-campus-border">Đang giao dịch</span>`;
-    case 'SOLD':
-      return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-200 text-slate-700">Đã bán</span>`;
-    case 'REJECTED':
-      return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 text-red-600 border border-red-200">Đã từ chối</span>`;
-    default:
-      return `<span class="px-2 py-0.5 rounded-full text-xs bg-slate-100">${status}</span>`;
-  }
-}
-
-function renderModerationTable() {
-  const query = (document.getElementById('admin-search-input')?.value || '').trim().toLowerCase();
-  const filtered = allProducts.filter(p => {
-    const matchStatus = currentStatusFilter === 'ALL' || p.status === currentStatusFilter;
-    const matchQuery = !query ||
-      (p.title || '').toLowerCase().includes(query) ||
-      (p.seller?.fullName || '').toLowerCase().includes(query) ||
-      (p.universityShortName || '').toLowerCase().includes(query);
-    return matchStatus && matchQuery;
-  });
-
-  const tbody = document.getElementById('moderation-tbody');
-  if (filtered.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="6" class="py-10 text-center text-slate-400 text-xs">Không có tin đăng nào khớp với bộ lọc hiện tại.</td>
-      </tr>
-    `;
-    return;
-  }
-
-  tbody.innerHTML = filtered.map(p => `
-    <tr class="hover:bg-slate-50/80 transition-colors animate-row">
-      <td class="py-3.5 px-4">
-        <div class="flex items-center gap-3 max-w-xs">
-          <img src="${(p.imageUrls && p.imageUrls[0]) || ''}" alt="${p.title}" class="w-12 h-12 rounded-xl object-cover flex-shrink-0 border border-slate-200 bg-slate-100" />
-          <div class="min-w-0">
-            <p class="font-bold text-slate-900 text-xs line-clamp-1">${p.title}</p>
-            <p class="text-[11px] text-slate-500 mt-0.5">${p.conditionLabel || 'Mới 95%'} • ${p.pickupSpot || 'Sảnh KTX'}</p>
-          </div>
-        </div>
-      </td>
-      <td class="py-3.5 px-4">
-        <span class="block text-xs font-semibold text-slate-800">${p.categoryName || 'Đồ dùng KTX'}</span>
-        <span class="inline-flex items-center gap-1 text-[11px] text-campus font-semibold mt-0.5">
-          <span class="material-symbols-outlined text-[13px]">location_on</span>
-          ${p.universityShortName || 'KTX Khu B'}
-        </span>
-      </td>
-      <td class="py-3.5 px-4 tabular-nums">
-        <span class="font-extrabold text-xs text-primary">${formatVND(p.price)}</span>
-        ${p.originalPrice ? `<span class="block text-[11px] text-slate-400 line-through">${formatVND(p.originalPrice)}</span>` : ''}
-      </td>
-      <td class="py-3.5 px-4">
-        <div class="flex items-center gap-1.5">
-          <span class="text-xs font-bold text-slate-800">${p.seller?.fullName || 'Sinh viên'}</span>
-          <span class="material-symbols-outlined text-[14px] text-campus" title="Đã xác thực SV">verified</span>
-        </div>
-        <span class="block text-[11px] text-slate-500">${p.seller?.email || ''}</span>
-      </td>
-      <td class="py-3.5 px-4">
-        ${getStatusBadgeHtml(p.status)}
-        ${p.rejectReason ? `<p class="text-[10px] text-red-500 mt-1 max-w-[150px] truncate" title="${p.rejectReason}">Lý do: ${p.rejectReason}</p>` : ''}
-      </td>
-      <td class="py-3.5 px-4 text-right">
-        <div class="inline-flex items-center gap-1.5">
-          <button onclick="previewProduct(${p.id})" class="h-8 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1 transition-colors">
-            <span class="material-symbols-outlined text-[15px]">visibility</span>
-            <span>Chi tiết</span>
-          </button>
-          ${p.status !== 'APPROVED' ? `
-            <button onclick="approveProduct(${p.id})" class="h-8 px-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold flex items-center gap-1 transition-colors shadow-2xs">
-              <span class="material-symbols-outlined text-[15px]">check</span>
-              <span>Duyệt</span>
-            </button>
-          ` : ''}
-          ${p.status !== 'REJECTED' ? `
-            <button onclick="promptRejectProduct(${p.id})" class="h-8 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold flex items-center gap-1 transition-colors">
-              <span class="material-symbols-outlined text-[15px]">block</span>
-              <span>Từ chối</span>
-            </button>
-          ` : ''}
-          <button onclick="promptDeleteProduct(${p.id})" class="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center transition-colors" title="Xóa tin vi phạm">
-            <span class="material-symbols-outlined text-[16px]">delete</span>
-          </button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
 }
 
 async function approveProduct(id) {
   try {
-    if (adminToken) {
-      await fetch(`${API_BASE}/admin/products/${id}/approve`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${adminToken}` }
-      });
-    }
-  } catch (_) {}
+    await api(`/admin/products/${id}/approve`, 'PUT');
+    showToast('✅ Đã duyệt bài đăng!');
+    loadPending();
+  } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
+}
 
-  const item = allProducts.find(p => p.id === id);
-  if (item) {
-    item.status = 'APPROVED';
-    item.rejectReason = null;
+function openRejectModal(id) {
+  document.getElementById('rejectProductId').value = id;
+  document.getElementById('rejectReason').value = '';
+  openModal('rejectModal');
+}
+
+async function confirmReject() {
+  const id     = document.getElementById('rejectProductId').value;
+  const reason = document.getElementById('rejectReason').value.trim();
+  try {
+    await api(`/admin/products/${id}/reject`, 'PUT', { reason });
+    showToast('❌ Đã từ chối tin đăng!', 'warn');
+    closeModal('rejectModal');
+    loadPending();
+  } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
+}
+
+// =============================================================================
+// ALL PRODUCTS
+// =============================================================================
+async function loadProducts() {
+  const statusFilter = document.getElementById('productStatusFilter').value;
+  document.getElementById('productsBody').innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400"><span class="material-symbols-outlined spin">sync</span> Đang tải...</td></tr>';
+  try {
+    const url = statusFilter ? `/admin/products?status=${statusFilter}` : '/admin/products';
+    allProducts = await api(url);
+    renderProductsTable(allProducts);
+  } catch (err) {
+    document.getElementById('productsBody').innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-400">Lỗi: ${err.message}</td></tr>`;
   }
-  renderDashboard();
-  renderModerationTable();
-  showToast(`Đã duyệt tin đăng #${id}! Tin đã hiển thị trên Chợ Sinh Viên.`);
 }
 
-function promptRejectProduct(id) {
-  const item = allProducts.find(p => p.id === id);
-  openDialog({
-    title: 'Từ chối kiểm duyệt tin đăng',
-    subtitle: item ? item.title : `Mã tin #${id}`,
-    icon: 'gpp_bad',
-    iconClass: 'bg-red-50 text-red-600',
-    confirmText: 'Xác nhận Từ chối',
-    confirmClass: 'bg-red-600 hover:bg-red-700 text-white',
-    bodyHtml: `
-      <div class="space-y-3">
-        <p class="text-xs text-slate-600">Chọn hoặc nhập lý do từ chối để thông báo tới sinh viên đăng bài:</p>
-        <select id="reject-reason-select" class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 outline-none">
-          <option value="Ảnh chụp mờ hoặc lấy ảnh mạng, vui lòng chụp ảnh thật tại KTX">Ảnh mạng / Không phải ảnh chụp thực tế món đồ</option>
-          <option value="Giá bán không hợp lý hoặc thông tin mô tả chưa rõ ràng">Giá bán ảo / Mô tả thiếu thông tin tình trạng</option>
-          <option value="Vật phẩm không thuộc danh mục cho phép trao đổi trong khuôn viên trường">Vật phẩm vi phạm quy định Ký túc xá</option>
-        </select>
-      </div>
-    `,
-    onConfirm: async () => {
-      const reason = document.getElementById('reject-reason-select').value;
-      try {
-        if (adminToken) {
-          await fetch(`${API_BASE}/admin/products/${id}/reject`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${adminToken}`
-            },
-            body: JSON.stringify({ reason })
-          });
-        }
-      } catch (_) {}
-      if (item) {
-        item.status = 'REJECTED';
-        item.rejectReason = reason;
-      }
-      closeDialog();
-      renderDashboard();
-      renderModerationTable();
-      showToast(`Đã từ chối tin đăng #${id} kèm lý do nhắc nhở sinh viên.`, 'error');
-    }
-  });
+function filterProducts() {
+  const q = document.getElementById('productSearch').value.toLowerCase();
+  renderProductsTable(allProducts.filter(p =>
+    (p.title || '').toLowerCase().includes(q) ||
+    (p.seller?.fullName || '').toLowerCase().includes(q) ||
+    (p.categoryName || p.category?.name || '').toLowerCase().includes(q)
+  ));
 }
 
-function promptDeleteProduct(id) {
-  const item = allProducts.find(p => p.id === id);
-  openDialog({
-    title: 'Xóa vĩnh viễn tin đăng?',
-    subtitle: 'Hành động này không thể hoàn tác',
-    icon: 'delete_forever',
-    iconClass: 'bg-red-50 text-red-600',
-    confirmText: 'Xóa tin ngay',
-    confirmClass: 'bg-red-600 hover:bg-red-700 text-white',
-    bodyHtml: `
-      <p class="text-xs text-slate-600 leading-relaxed">
-        Bạn có chắc chắn muốn xóa tin đăng <strong class="text-slate-900">"${item ? item.title : '#' + id}"</strong> khỏi cơ sở dữ liệu Supabase không?
-      </p>
-    `,
-    onConfirm: async () => {
-      try {
-        if (adminToken) {
-          await fetch(`${API_BASE}/admin/products/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${adminToken}` }
-          });
-        }
-      } catch (_) {}
-      allProducts = allProducts.filter(p => p.id !== id);
-      closeDialog();
-      renderDashboard();
-      renderModerationTable();
-      showToast(`Đã xóa tin đăng #${id} khỏi hệ thống!`);
-    }
-  });
-}
-
-function previewProduct(id) {
-  const p = allProducts.find(item => item.id === id);
-  if (!p) return;
-  openDialog({
-    title: p.title,
-    subtitle: `${p.categoryName || 'Đồ sinh viên'} • ${p.universityShortName || 'KTX Khu B'}`,
-    icon: 'inventory_2',
-    confirmText: p.status === 'PENDING' ? 'Duyệt tin này' : 'Đóng',
-    bodyHtml: `
-      <div class="space-y-3">
-        <img src="${(p.imageUrls && p.imageUrls[0]) || ''}" class="w-full h-44 object-cover rounded-xl border border-slate-200" />
-        <div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl">
+function renderProductsTable(products) {
+  const tbody = document.getElementById('productsBody');
+  if (!products || products.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400">Không có sản phẩm nào.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = products.map(p => `
+    <tr class="hover:bg-slate-50 transition-colors">
+      <td>
+        <div class="flex items-center gap-3">
+          <img src="${p.imageUrls?.[0] || 'https://via.placeholder.com/48'}" onerror="this.src='https://via.placeholder.com/48'"
+               class="w-12 h-12 rounded-lg object-cover bg-slate-100 flex-shrink-0" />
           <div>
-            <span class="text-[11px] text-slate-500 block">Giá pass sinh viên</span>
-            <span class="text-base font-extrabold text-primary">${formatVND(p.price)}</span>
-          </div>
-          <div class="text-right">
-            <span class="text-[11px] text-slate-500 block">Điểm hẹn giao dịch</span>
-            <span class="text-xs font-bold text-slate-800">${p.pickupSpot || 'Sảnh KTX'}</span>
-          </div>
-        </div>
-        <p class="text-xs text-slate-600 leading-relaxed">${p.description || ''}</p>
-      </div>
-    `,
-    onConfirm: () => {
-      closeDialog();
-      if (p.status === 'PENDING') approveProduct(p.id);
-    }
-  });
-}
-
-function renderUsersTable() {
-  const tbody = document.getElementById('users-tbody');
-  tbody.innerHTML = allUsers.map(u => `
-    <tr class="hover:bg-slate-50/80 transition-colors">
-      <td class="py-3.5 px-4">
-        <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-full bg-primary-light text-primary font-bold text-xs flex items-center justify-center">
-            ${(u.fullName || 'SV').split(' ').pop().substring(0, 2).toUpperCase()}
-          </div>
-          <div>
-            <p class="text-xs font-bold text-slate-900">${u.fullName}</p>
-            <p class="text-[11px] text-slate-500">${u.completedDeals || 0} giao dịch thành công</p>
+            <div class="font-medium text-slate-800 max-w-xs truncate text-sm">${p.title}</div>
+            <div class="text-xs text-slate-400">${p.isFree ? '🎁 Miễn phí' : ''} ${p.isUrgent ? '🔥 Urgent' : ''}</div>
           </div>
         </div>
       </td>
-      <td class="py-3.5 px-4">
-        <span class="font-mono text-xs font-semibold text-slate-800 block">${u.studentId || 'SV2026'}</span>
-        <span class="text-[11px] text-slate-500">${u.email}</span>
+      <td>
+        <div class="text-sm font-medium">${p.seller?.fullName || '—'}</div>
+        <div class="text-xs text-slate-400">${p.seller?.email || ''}</div>
       </td>
-      <td class="py-3.5 px-4">
-        <span class="text-xs font-semibold text-slate-800 block">${u.universityShortName || 'ĐHQG TP.HCM'}</span>
-        <span class="text-[11px] text-slate-500">${u.dormArea || 'KTX Khu B'}</span>
-      </td>
-      <td class="py-3.5 px-4">
-        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}">
-          ${u.role}
-        </span>
-      </td>
-      <td class="py-3.5 px-4">
-        <button onclick="toggleVerifyUser(${u.id})" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-          u.verifiedStudent ? 'bg-campus-light text-campus border border-campus-border' : 'bg-slate-100 text-slate-500'
-        }">
-          <span class="material-symbols-outlined text-[14px]">${u.verifiedStudent ? 'verified' : 'help'}</span>
-          <span>${u.verifiedStudent ? 'Đã xác thực SV' : 'Chưa xác thực'}</span>
-        </button>
-      </td>
-      <td class="py-3.5 px-4">
-        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-          u.active ? 'bg-primary-light text-primary' : 'bg-red-50 text-red-600'
-        }">
-          ${u.active ? 'Hoạt động' : 'Đã khóa'}
-        </span>
-      </td>
-      <td class="py-3.5 px-4 text-right">
-        ${u.role !== 'ADMIN' ? `
-          <button onclick="toggleActiveUser(${u.id})" class="h-8 px-3 rounded-lg text-xs font-bold transition-colors ${
-            u.active ? 'bg-red-50 hover:bg-red-100 text-red-600' : 'bg-primary text-white'
-          }">
-            ${u.active ? 'Khóa TK' : 'Mở khóa'}
+      <td class="font-semibold text-primary text-sm">${fmt(p.price)}</td>
+      <td class="text-sm text-slate-600">${p.categoryName || p.category?.name || '—'}</td>
+      <td>${statusBadge(p.status)}</td>
+      <td class="text-xs text-slate-400">${p.createdAt || '—'}</td>
+      <td class="text-center">
+        <div class="flex items-center justify-center gap-1">
+          <button onclick="viewProduct(${p.id})" class="btn btn-ghost text-xs py-1 px-2">
+            <span class="material-symbols-outlined text-sm">visibility</span>
           </button>
-        ` : '<span class="text-xs text-slate-400 font-medium">Quản trị viên</span>'}
+          ${p.status === 'PENDING' ? `
+            <button onclick="approveProduct(${p.id})" class="btn btn-success text-xs py-1 px-2">
+              <span class="material-symbols-outlined text-sm">check</span>
+            </button>
+            <button onclick="openRejectModal(${p.id})" class="btn btn-danger text-xs py-1 px-2">
+              <span class="material-symbols-outlined text-sm">block</span>
+            </button>` : ''}
+          <button onclick="deleteProduct(${p.id})" class="btn btn-ghost text-red-400 hover:text-red-600 text-xs py-1 px-2">
+            <span class="material-symbols-outlined text-sm">delete</span>
+          </button>
+        </div>
       </td>
     </tr>
   `).join('');
 }
 
-async function toggleActiveUser(id) {
-  const user = allUsers.find(u => u.id === id);
-  if (!user) return;
+async function deleteProduct(id) {
+  if (!confirm('Xác nhận xóa sản phẩm này khỏi hệ thống?')) return;
   try {
-    if (adminToken) {
-      await fetch(`${API_BASE}/admin/users/${id}/toggle-active`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${adminToken}` }
-      });
-    }
-  } catch (_) {}
-  user.active = !user.active;
-  renderUsersTable();
-  showToast(user.active ? `Đã mở khóa tài khoản ${user.fullName}!` : `Đã khóa tài khoản ${user.fullName}!`);
+    await api(`/admin/products/${id}`, 'DELETE');
+    showToast('🗑️ Đã xóa sản phẩm!', 'warn');
+    loadProducts();
+  } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
 }
 
-async function toggleVerifyUser(id) {
-  const user = allUsers.find(u => u.id === id);
-  if (!user) return;
+async function viewProduct(id) {
   try {
-    if (adminToken) {
-      await fetch(`${API_BASE}/admin/users/${id}/toggle-verified`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${adminToken}` }
-      });
-    }
-  } catch (_) {}
-  user.verifiedStudent = !user.verifiedStudent;
-  renderUsersTable();
-  showToast(`Đã cập nhật trạng thái xác thực thẻ sinh viên của ${user.fullName}!`);
-}
-
-function openCreatePostModal() {
-  openDialog({
-    title: 'Đăng tin mới lên Chợ Sinh Viên',
-    subtitle: 'Tin đăng bởi Admin sẽ được duyệt hiển thị ngay lập tức',
-    icon: 'add_Business',
-    confirmText: 'Đăng tin ngay',
-    bodyHtml: `
-      <div class="space-y-3">
-        <div>
-          <label class="text-xs font-bold text-slate-700 block mb-1">Tên món đồ cần pass *</label>
-          <input id="new-post-title" type="text" placeholder="VD: Giáo trình Kinh tế vĩ mô, Bàn gấp KTX..." class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs outline-none focus:border-primary" />
-        </div>
-        <div class="grid grid-cols-2 gap-2.5">
-          <div>
-            <label class="text-xs font-bold text-slate-700 block mb-1">Giá bán (VNĐ) *</label>
-            <input id="new-post-price" type="number" value="85000" class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs outline-none focus:border-primary" />
-          </div>
-          <div>
-            <label class="text-xs font-bold text-slate-700 block mb-1">Trường / KTX</label>
-            <select id="new-post-uni" class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs outline-none">
-              <option value="1">KTX Khu B - ĐHQG</option>
-              <option value="2">ĐH Bách Khoa</option>
-              <option value="3">ĐH Tự Nhiên</option>
-              <option value="4">ĐH CNTT - UIT</option>
-            </select>
-          </div>
+    const p = await api(`/products/${id}`);
+    document.getElementById('productModalContent').innerHTML = `
+      <div class="space-y-4">
+        <div class="flex gap-3 overflow-x-auto pb-2">
+          ${(p.imageUrls || []).map(url => `<img src="${url}" class="h-48 w-auto rounded-xl object-cover flex-shrink-0" />`).join('') || '<div class="h-48 w-full bg-slate-100 rounded-xl flex items-center justify-center text-slate-400">Không có ảnh</div>'}
         </div>
         <div>
-          <label class="text-xs font-bold text-slate-700 block mb-1">Điểm hẹn giao dịch an toàn</label>
-          <input id="new-post-spot" type="text" value="Sảnh Tầng 1 Tòa BA1 - KTX Khu B" class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs outline-none focus:border-primary" />
+          <div class="flex items-start justify-between gap-3 mb-2">
+            <h2 class="font-bold text-lg text-slate-800">${p.title}</h2>
+            ${statusBadge(p.status)}
+          </div>
+          <div class="text-2xl font-bold text-primary">${fmt(p.price)} ${p.originalPrice ? `<span class="text-sm font-normal text-slate-400 line-through ml-2">${fmt(p.originalPrice)}</span>` : ''}</div>
         </div>
+        <div class="text-sm text-slate-600 leading-relaxed">${p.description || ''}</div>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div class="bg-slate-50 p-3 rounded-xl"><div class="text-xs text-slate-400 mb-1">Người bán</div><div class="font-medium">${p.seller?.fullName || '—'}</div></div>
+          <div class="bg-slate-50 p-3 rounded-xl"><div class="text-xs text-slate-400 mb-1">Danh mục</div><div class="font-medium">${p.categoryName || p.category?.name || '—'}</div></div>
+          <div class="bg-slate-50 p-3 rounded-xl"><div class="text-xs text-slate-400 mb-1">Tình trạng</div><div class="font-medium">${p.conditionLabel || p.itemCondition || '—'}</div></div>
+          <div class="bg-slate-50 p-3 rounded-xl"><div class="text-xs text-slate-400 mb-1">Lý do pass</div><div class="font-medium">${p.passReason || '—'}</div></div>
+          <div class="bg-slate-50 p-3 rounded-xl"><div class="text-xs text-slate-400 mb-1">Địa điểm gặp</div><div class="font-medium">${p.pickupSpot || '—'}</div></div>
+          <div class="bg-slate-50 p-3 rounded-xl"><div class="text-xs text-slate-400 mb-1">Ngày đăng</div><div class="font-medium">${p.createdAt || '—'}</div></div>
+        </div>
+        ${p.status === 'PENDING' ? `
+          <div class="flex gap-3 pt-4 border-t">
+            <button onclick="approveProduct(${p.id}); closeModal('productModal')" class="btn btn-success flex-1 justify-center">✅ Duyệt bài</button>
+            <button onclick="closeModal('productModal'); openRejectModal(${p.id})" class="btn btn-danger flex-1 justify-center">❌ Từ chối</button>
+          </div>` : ''}
+        ${p.rejectReason ? `<div class="bg-red-50 border border-red-200 p-3 rounded-xl text-sm text-red-700"><strong>Lý do từ chối:</strong> ${p.rejectReason}</div>` : ''}
       </div>
-    `,
-    onConfirm: async () => {
-      const title = document.getElementById('new-post-title').value.trim();
-      const price = Number(document.getElementById('new-post-price').value || 0);
-      const universityId = Number(document.getElementById('new-post-uni').value || 1);
-      const pickupSpot = document.getElementById('new-post-spot').value.trim();
-      if (!title) {
-        showToast('Vui lòng nhập tên món đồ!', 'error');
-        return;
-      }
-      try {
-        if (adminToken) {
-          const res = await fetch(`${API_BASE}/products?autoApprove=true`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${adminToken}`
-            },
-            body: JSON.stringify({
-              title,
-              price,
-              originalPrice: price * 2,
-              categoryId: 1,
-              universityId,
-              pickupSpot,
-              description: 'Tin đăng kiểm định bởi Ban quản trị PassUni KTX.'
-            })
-          });
-          if (res.ok) {
-            closeDialog();
-            await refreshAllData();
-            showToast('Đã đăng tin mới thành công lên Supabase!');
-            return;
-          }
-        }
-      } catch (_) {}
+    `;
+    openModal('productModal');
+  } catch (err) { showToast('Lỗi tải chi tiết: ' + err.message, 'error'); }
+}
 
-      allProducts.unshift({
-        id: Date.now() % 10000,
-        title,
-        price,
-        originalPrice: price * 2,
-        conditionLabel: 'Mới 95%',
-        pickupSpot,
-        status: 'APPROVED',
-        categoryName: 'Giáo trình & Sách',
-        universityShortName: 'KTX Khu B',
-        imageUrls: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&auto=format&fit=crop&q=80'],
-        seller: { fullName: 'Ban Quản Trị PassUni', email: 'admin@chodocu.edu.vn', verifiedStudent: true }
-      });
-      closeDialog();
-      renderDashboard();
-      renderModerationTable();
-      showToast('Đã tạo tin đăng mới thành công!');
+// =============================================================================
+// ORDERS
+// =============================================================================
+async function loadOrders() {
+  const statusFilter = document.getElementById('orderStatusFilter').value;
+  document.getElementById('ordersBody').innerHTML = '<tr><td colspan="10" class="text-center py-8 text-slate-400"><span class="material-symbols-outlined spin">sync</span> Đang tải...</td></tr>';
+  try {
+    const orders = await api('/admin/orders' + (statusFilter ? `?status=${statusFilter}` : ''));
+    const tbody = document.getElementById('ordersBody');
+    if (!orders || orders.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-slate-400">Không có đơn hàng.</td></tr>';
+      return;
     }
+    tbody.innerHTML = orders.map(o => {
+      const canAccept = o.status === 'PENDING' || o.status === 'DISPUTED';
+      const canComplete = o.status === 'ACCEPTED' || o.status === 'PENDING' || o.status === 'DISPUTED';
+      const canCancel = !['COMPLETED', 'CANCELLED', 'REJECTED'].includes(o.status);
+      return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="font-mono text-xs text-slate-500">${o.orderCode || '#' + o.id}</td>
+        <td class="text-sm font-medium max-w-[150px] truncate">${o.product?.title || '—'}</td>
+        <td class="text-sm">${o.buyer?.fullName || '—'}</td>
+        <td class="text-sm">${o.seller?.fullName || '—'}</td>
+        <td class="font-semibold text-slate-800 text-sm">${fmt(o.offeredPrice)}</td>
+        <td class="text-gold font-medium text-sm">${o.platformFeeAmount ? fmt(o.platformFeeAmount) : '—'}</td>
+        <td class="text-primary font-medium text-sm">${o.finalSellerAmount ? fmt(o.finalSellerAmount) : '—'}</td>
+        <td>${statusBadge(o.status)}</td>
+        <td class="text-xs text-slate-400">${o.createdAt || '—'}</td>
+        <td class="text-center">
+          <div class="flex items-center justify-center gap-1">
+            ${canAccept ? `<button onclick="adminUpdateOrder(${o.id}, 'ACCEPTED')" class="btn btn-ghost text-xs py-1 px-2" title="Duyệt đơn"><span class="material-symbols-outlined text-sm">check_circle</span></button>` : ''}
+            ${canComplete ? `<button onclick="adminUpdateOrder(${o.id}, 'COMPLETED')" class="btn btn-success text-xs py-1 px-2" title="Hoàn tất"><span class="material-symbols-outlined text-sm">done_all</span></button>` : ''}
+            ${canCancel ? `<button onclick="adminUpdateOrder(${o.id}, 'CANCELLED')" class="btn btn-danger text-xs py-1 px-2" title="Hủy đơn"><span class="material-symbols-outlined text-sm">cancel</span></button>` : ''}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    document.getElementById('ordersBody').innerHTML = `<tr><td colspan="10" class="text-center py-8 text-red-400">Lỗi: ${err.message}</td></tr>`;
+  }
+}
+
+async function adminUpdateOrder(id, status) {
+  const labels = { ACCEPTED: 'duyệt', COMPLETED: 'hoàn tất', CANCELLED: 'hủy' };
+  const note = prompt(`Ghi chú khi ${labels[status] || 'cập nhật'} đơn (không bắt buộc):`, '');
+  if (note === null) return;
+  try {
+    await api(`/admin/orders/${id}/status`, 'PUT', { status, note });
+    showToast('✅ Đã cập nhật đơn hàng!');
+    loadOrders();
+  } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
+}
+
+// =============================================================================
+// FINANCIAL
+// =============================================================================
+async function loadFinancial() {
+  try {
+    const fin = await api('/admin/financial');
+    financialData = fin;
+
+    document.getElementById('fin-totalFee').textContent       = fmt(fin.totalPlatformFees);
+    document.getElementById('fin-totalValue').textContent     = fmt(fin.totalTransactionValue);
+    document.getElementById('fin-totalCompleted').textContent = fmtNum(fin.totalCompletedOrders) + ' đơn';
+
+    const rate = parseFloat(fin.currentFeeRate || 0);
+    document.getElementById('curFeeRate').textContent   = (rate * 100).toFixed(1) + '%';
+    document.getElementById('curMinFee').textContent    = fmt(fin.minFee);
+    document.getElementById('curMaxFee').textContent    = fmt(fin.maxFee);
+    document.getElementById('feeRate').value            = (rate * 100).toFixed(1);
+    document.getElementById('minFee').value             = fin.minFee || '';
+    document.getElementById('maxFee').value             = fin.maxFee || '';
+
+    const enabled = fin.feeEnabled !== false;
+    document.getElementById('feeStatusBadge').textContent = enabled ? '● Đang thu phí' : '○ Miễn phí';
+    document.getElementById('feeStatusBadge').className   = `ml-auto badge ${enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`;
+    if (fin.feePayer && document.getElementById('feePayer')) {
+      document.getElementById('feePayer').value = fin.feePayer;
+    }
+
+    updateFeePreviews(rate, parseFloat(fin.minFee || 2000), parseFloat(fin.maxFee || 50000), enabled);
+    refreshFeePreviews();
+    loadFeeTiers();
+
+    // Transactions table
+    const rows = (fin.recentTransactions || []).map(t => `
+      <tr class="hover:bg-slate-50">
+        <td class="font-mono text-xs">#${t.id}</td>
+        <td class="text-sm max-w-[150px] truncate font-medium">${t.productTitle || '—'}</td>
+        <td class="text-sm">${t.buyerName || '—'}</td>
+        <td class="text-sm">${t.sellerName || '—'}</td>
+        <td class="font-semibold text-sm">${fmt(t.transactionAmount)}</td>
+        <td class="text-xs text-slate-500">${fmtPct(t.platformFeeRate)}</td>
+        <td class="text-gold font-semibold text-sm">${fmt(t.platformFeeAmount)}</td>
+        <td class="text-primary font-semibold text-sm">${fmt(t.sellerReceiveAmount)}</td>
+        <td class="text-xs text-slate-400">${t.createdAt || '—'}</td>
+      </tr>
+    `).join('');
+    document.getElementById('transactionBody').innerHTML = rows || '<tr><td colspan="9" class="text-center py-8 text-slate-400">Chưa có giao dịch nào.</td></tr>';
+  } catch (err) {
+    showToast('Lỗi tải tài chính: ' + err.message, 'error');
+  }
+}
+
+function updateFeePreviews(rate, minFee, maxFee, enabled) {
+  function calcFee(amount) {
+    if (!enabled) return 0;
+    let fee = Math.round(amount * rate);
+    if (fee < minFee) fee = minFee;
+    if (fee > maxFee) fee = maxFee;
+    return fee;
+  }
+  [50000, 500000, 2000000].forEach((amount, i) => {
+    const ids = ['50k', '500k', '2m'];
+    const fee = calcFee(amount);
+    document.getElementById(`preview${ids[i]}`).textContent = fmt(fee);
+    document.getElementById(`preview${ids[i]}Seller`).textContent = fmt(amount - fee);
   });
 }
 
-function openLoginModal() {
-  openDialog({
-    title: 'Đăng nhập Quản trị viên (JWT Auth)',
-    subtitle: 'Tài khoản mặc định: admin@chodocu.edu.vn / admin123',
-    icon: 'admin_panel_settings',
-    confirmText: 'Đăng nhập JWT',
-    bodyHtml: `
-      <div class="space-y-3">
-        <div>
-          <label class="text-xs font-bold text-slate-700 block mb-1">Email Quản trị viên</label>
-          <input id="login-email" type="email" value="admin@chodocu.edu.vn" class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs outline-none" />
-        </div>
-        <div>
-          <label class="text-xs font-bold text-slate-700 block mb-1">Mật khẩu</label>
-          <input id="login-pass" type="password" value="admin123" class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs outline-none" />
-        </div>
-      </div>
-    `,
-    onConfirm: async () => {
-      const email = document.getElementById('login-email').value.trim();
-      const password = document.getElementById('login-pass').value;
-      try {
-        const res = await fetch(`${API_BASE}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        const json = await res.json();
-        if (res.ok && json.data?.accessToken) {
-          adminToken = json.data.accessToken;
-          localStorage.setItem('passuni_admin_token', adminToken);
-          document.getElementById('admin-name').textContent = json.data.user.fullName;
-          document.getElementById('admin-email').textContent = json.data.user.email;
-          closeDialog();
-          await refreshAllData(true);
-          return;
-        }
-      } catch (_) {}
-      closeDialog();
-      showToast('Đã xác thực phiên Quản trị viên PassUni!');
-    }
-  });
+async function updateSetting(key, value) {
+  if (!value || value.trim() === '' || isNaN(parseFloat(value))) {
+    showToast('Giá trị không hợp lệ!', 'error'); return;
+  }
+  try {
+    await api(`/admin/settings/${key}`, 'PUT', { value });
+    showToast('✅ Đã cập nhật cài đặt!');
+    loadFinancial();
+  } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  refreshAllData(false);
+async function toggleFee() {
+  const current = financialData?.feeEnabled !== false;
+  const newVal = !current;
+  try {
+    await api('/admin/settings/fee_enabled', 'PUT', { value: newVal.toString() });
+    showToast(newVal ? '✅ Đã bật thu phí sàn!' : '🔕 Đã tắt thu phí (miễn phí)!', newVal ? 'success' : 'warn');
+    loadFinancial();
+  } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
+}
+
+// =============================================================================
+// FEE TIERS
+// =============================================================================
+let feeTiers = [];
+
+async function loadFeeTiers() {
+  try {
+    feeTiers = await api('/admin/fee-tiers');
+    renderFeeTiers();
+  } catch (err) {
+    const el = document.getElementById('feeTiersBody');
+    if (el) el.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-red-400">Lỗi tải bậc phí: ${err.message}</td></tr>`;
+  }
+}
+
+function renderFeeTiers() {
+  const tbody = document.getElementById('feeTiersBody');
+  if (!tbody) return;
+  if (!feeTiers || feeTiers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-400">Chưa có bậc phí nào (đang dùng tỷ lệ cơ bản).</td></tr>';
+    return;
+  }
+  tbody.innerHTML = feeTiers.map(t => `
+    <tr class="hover:bg-slate-50">
+      <td class="text-sm font-medium">${t.name}</td>
+      <td class="text-sm">${fmt(t.minAmount)}</td>
+      <td class="text-sm">${t.maxAmount != null ? fmt(t.maxAmount) : '∞'}</td>
+      <td class="text-sm font-semibold text-gold">${(parseFloat(t.feeRate) * 100).toFixed(1)}%</td>
+      <td class="text-sm">${t.priority ?? 0}</td>
+      <td>${t.active ? '<span class="badge bg-emerald-100 text-emerald-700">Đang áp dụng</span>' : '<span class="badge bg-slate-100 text-slate-500">Đã tắt</span>'}</td>
+      <td class="text-center">
+        <div class="flex justify-center gap-1">
+          <button onclick="openTierModal(${t.id})" class="btn btn-ghost text-xs py-1 px-2"><span class="material-symbols-outlined text-sm">edit</span></button>
+          ${t.active ? `<button onclick="deleteTier(${t.id})" class="btn btn-ghost text-red-400 text-xs py-1 px-2"><span class="material-symbols-outlined text-sm">block</span></button>` : ''}
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function openTierModal(id) {
+  const t = id ? feeTiers.find(x => x.id === id) : null;
+  document.getElementById('tierId').value = t ? t.id : '';
+  document.getElementById('tierName').value = t ? t.name : '';
+  document.getElementById('tierMin').value = t ? t.minAmount : 0;
+  document.getElementById('tierMax').value = t && t.maxAmount != null ? t.maxAmount : '';
+  document.getElementById('tierRate').value = t ? (parseFloat(t.feeRate) * 100) : 3;
+  document.getElementById('tierPriority').value = t ? (t.priority ?? 10) : 10;
+  openModal('tierModal');
+}
+
+async function saveTier() {
+  const id = document.getElementById('tierId').value;
+  const maxRaw = document.getElementById('tierMax').value;
+  const body = {
+    name: document.getElementById('tierName').value.trim(),
+    minAmount: parseFloat(document.getElementById('tierMin').value || 0),
+    maxAmount: maxRaw === '' ? null : parseFloat(maxRaw),
+    feeRate: parseFloat(document.getElementById('tierRate').value || 0) / 100,
+    priority: parseInt(document.getElementById('tierPriority').value || 0, 10),
+    active: true
+  };
+  if (!body.name) { showToast('Nhập tên bậc phí!', 'error'); return; }
+  try {
+    if (id) await api(`/admin/fee-tiers/${id}`, 'PUT', body);
+    else await api('/admin/fee-tiers', 'POST', body);
+    showToast('✅ Đã lưu bậc phí!');
+    closeModal('tierModal');
+    loadFeeTiers();
+    loadFinancial();
+  } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
+}
+
+async function deleteTier(id) {
+  if (!confirm('Tắt bậc phí này? (Không xóa để giữ lịch sử đối chiếu)')) return;
+  try {
+    await api(`/admin/fee-tiers/${id}`, 'DELETE');
+    showToast('Đã tắt bậc phí!', 'warn');
+    loadFeeTiers();
+  } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
+}
+
+/** Gọi backend để xem trước phí (tôn trọng bậc phí + min/max + làm tròn). */
+async function refreshFeePreviews() {
+  for (const [amount, key] of [[50000, '50k'], [500000, '500k'], [2000000, '2m']]) {
+    try {
+      const p = await api(`/admin/fee/preview?amount=${amount}`);
+      const feeEl = document.getElementById(`preview${key}`);
+      const sellerEl = document.getElementById(`preview${key}Seller`);
+      if (feeEl) feeEl.textContent = fmt(p.platformFeeAmount);
+      if (sellerEl) sellerEl.textContent = fmt(p.sellerReceiveAmount);
+    } catch (_) { /* bỏ qua */ }
+  }
+}
+
+// =============================================================================
+// USERS
+// =============================================================================
+async function loadUsers() {
+  document.getElementById('usersBody').innerHTML = '<tr><td colspan="9" class="text-center py-8 text-slate-400"><span class="material-symbols-outlined spin">sync</span> Đang tải...</td></tr>';
+  try {
+    allUsers = await api('/admin/users');
+    filterUsers();
+  } catch (err) {
+    document.getElementById('usersBody').innerHTML = `<tr><td colspan="9" class="text-center py-8 text-red-400">Lỗi: ${err.message}</td></tr>`;
+  }
+}
+
+function filterUsers() {
+  const q    = (document.getElementById('userSearch').value || '').toLowerCase();
+  const role = document.getElementById('userRoleFilter').value;
+  const filtered = allUsers.filter(u =>
+    (!role || u.role === role) &&
+    (!q || (u.fullName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q))
+  );
+  renderUsersTable(filtered);
+}
+
+function renderUsersTable(users) {
+  const tbody = document.getElementById('usersBody');
+  if (!users || users.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-slate-400">Không tìm thấy người dùng.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = users.map(u => `
+    <tr class="hover:bg-slate-50 transition-colors ${u.active === false ? 'opacity-50' : ''}">
+      <td>
+        <div class="flex items-center gap-3">
+          <img src="${u.avatarUrl || `https://api.dicebear.com/7.x/notionists/svg?seed=${u.email}`}"
+               onerror="this.src='https://api.dicebear.com/7.x/notionists/svg?seed=default'"
+               class="w-9 h-9 rounded-full object-cover bg-slate-100" />
+          <div>
+            <div class="font-medium text-sm text-slate-800">${u.fullName || '—'}</div>
+            <div class="text-xs text-slate-400">${u.dormArea || ''}</div>
+          </div>
+        </div>
+      </td>
+      <td class="text-xs text-slate-600">${u.email || '—'}</td>
+      <td class="text-xs font-mono text-slate-500">${u.studentId || '—'}</td>
+      <td class="text-xs text-slate-600">${u.universityShortName || u.university?.shortName || '—'}</td>
+      <td>${roleBadge(u.role)}</td>
+      <td>${u.verifiedStudent ? '<span class="badge bg-emerald-100 text-emerald-700">✅ Đã xác thực</span>' : '<span class="badge bg-slate-100 text-slate-500">○ Chưa</span>'}</td>
+      <td class="text-sm">⭐ ${u.rating?.toFixed(1) || '5.0'}</td>
+      <td class="text-sm text-center">${u.completedDeals || 0}</td>
+      <td>
+        <div class="flex items-center gap-1">
+          <button onclick="toggleUserActive(${u.id})" class="btn btn-ghost text-xs py-1 px-2 ${u.active === false ? 'text-emerald-600' : 'text-amber-600'}" title="${u.active === false ? 'Mở khóa' : 'Khóa tài khoản'}">
+            <span class="material-symbols-outlined text-sm">${u.active === false ? 'lock_open' : 'lock'}</span>
+          </button>
+          <button onclick="toggleUserVerified(${u.id})" class="btn btn-ghost text-xs py-1 px-2 text-campus" title="Đổi xác thực SV">
+            <span class="material-symbols-outlined text-sm">verified_user</span>
+          </button>
+          ${currentUserRole === 'ADMIN' ? `
+          <select onchange="changeUserRole(${u.id}, this.value)" class="text-xs border border-slate-200 rounded-lg px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary/30">
+            <option value="">Role...</option>
+            <option value="STUDENT" ${u.role==='STUDENT'?'selected':''}>STUDENT</option>
+            <option value="MODERATOR" ${u.role==='MODERATOR'?'selected':''}>MODERATOR</option>
+            <option value="ADMIN" ${u.role==='ADMIN'?'selected':''}>ADMIN</option>
+          </select>` : ''}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function toggleUserActive(id) {
+  try {
+    await api(`/admin/users/${id}/toggle-active`, 'PUT');
+    showToast('✅ Đã cập nhật trạng thái tài khoản!');
+    loadUsers();
+  } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
+}
+
+async function toggleUserVerified(id) {
+  try {
+    await api(`/admin/users/${id}/toggle-verified`, 'PUT');
+    showToast('✅ Đã cập nhật xác thực sinh viên!');
+    loadUsers();
+  } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
+}
+
+async function changeUserRole(id, role) {
+  if (!role) return;
+  if (!confirm(`Xác nhận đổi role thành ${role}?`)) return;
+  try {
+    await api(`/admin/users/${id}/role`, 'PUT', { role });
+    showToast('✅ Đã cập nhật phân quyền!');
+    loadUsers();
+  } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
+}
+
+// =============================================================================
+// REPORTS
+// =============================================================================
+async function loadReports() {
+  const status = document.getElementById('reportStatusFilter').value;
+  document.getElementById('reportsBody').innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400"><span class="material-symbols-outlined spin">sync</span> Đang tải...</td></tr>';
+  try {
+    const reports = await api(`/admin/reports?status=${status}`);
+    const tbody = document.getElementById('reportsBody');
+    if (!reports || reports.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400">Không có báo cáo nào.</td></tr>';
+      // Update badge
+      document.getElementById('reportBadge').classList.add('hidden');
+      return;
+    }
+    const pendingCount = reports.filter(r => r.status === 'PENDING').length;
+    if (pendingCount > 0) {
+      document.getElementById('reportBadge').textContent = pendingCount;
+      document.getElementById('reportBadge').classList.remove('hidden');
+    }
+    tbody.innerHTML = reports.map(r => `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="font-mono text-xs text-slate-500">#${r.id}</td>
+        <td class="text-sm font-medium">${r.reporterName || '—'}</td>
+        <td class="text-sm max-w-[150px] truncate">${r.productTitle || '—'}</td>
+        <td><span class="badge bg-red-100 text-red-700">${r.reason || '—'}</span></td>
+        <td class="text-xs text-slate-600 max-w-[200px] truncate">${r.detail || '—'}</td>
+        <td>${reportStatusBadge(r.status)}</td>
+        <td class="text-xs text-slate-400">${r.createdAt || '—'}</td>
+        <td class="text-center">
+          ${r.status === 'PENDING' ? `
+            <button onclick="openResolveModal(${r.id})" class="btn btn-warning text-xs py-1 px-3">
+              <span class="material-symbols-outlined text-sm">gavel</span> Xử lý
+            </button>` : `<span class="text-xs text-slate-400">${r.adminNote || '—'}</span>`}
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    document.getElementById('reportsBody').innerHTML = `<tr><td colspan="8" class="text-center py-8 text-red-400">Lỗi: ${err.message}</td></tr>`;
+  }
+}
+
+function openResolveModal(id) {
+  document.getElementById('resolveReportId').value = id;
+  document.getElementById('resolveNote').value = '';
+  openModal('resolveModal');
+}
+
+async function resolveReport(action) {
+  const id   = document.getElementById('resolveReportId').value;
+  const note = document.getElementById('resolveNote').value.trim();
+  try {
+    await api(`/admin/reports/${id}/resolve`, 'PUT', { action, note });
+    showToast('✅ Đã xử lý báo cáo!');
+    closeModal('resolveModal');
+    loadReports();
+  } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
+}
+
+// =============================================================================
+// SETTINGS
+// =============================================================================
+async function loadSettings() {
+  try {
+    const settings = await api('/admin/settings');
+    const connRes = await fetch(`${API_BASE}/categories`).then(r => r.ok).catch(() => false);
+    document.getElementById('connStatus').textContent = connRes ? '● Kết nối OK' : '✕ Không kết nối được';
+    document.getElementById('connStatus').className = connRes ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold';
+
+    const list = document.getElementById('settingsList');
+    list.innerHTML = settings.map(s => `
+      <div class="flex items-start justify-between gap-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-sm text-slate-700 font-mono">${s.key}</div>
+          <div class="text-xs text-slate-400 mt-0.5">${s.description || ''}</div>
+          <div class="text-xs text-slate-500 mt-1">Cập nhật: ${s.updatedAt || '—'} bởi ${s.updatedBy || 'Hệ thống'}</div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <input id="setting_${s.key}" value="${s.value}" class="input w-36 text-sm font-mono" />
+          <button onclick="updateSetting('${s.key}', document.getElementById('setting_${s.key}').value)" class="btn btn-primary text-xs px-3">Lưu</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    document.getElementById('settingsList').innerHTML = `<div class="text-red-400 text-sm">Lỗi tải cài đặt: ${err.message}</div>`;
+  }
+}
+
+// =============================================================================
+// INIT
+// =============================================================================
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  }
 });
