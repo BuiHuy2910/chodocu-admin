@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" role="img" aria-label="Logo Chợ Đồ Cũ">
+  <title>Logo Chợ Đồ Cũ</title>
+  <path d="M54,0a54,54 0 1 1 0,108a54,54 0 1 1 0,-108Z" fill="#0D6531"/>
+  <path d="M22,50c-3.2,3 3.2,6 0,9c-3.2,3 3.2,6 0,9" fill="none" stroke="#FE6B1D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M87,53c-3.2,3 3.2,6 0,9c-3.2,3 3.2,6 0,9" fill="none" stroke="#FE6B1D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M79,23Q79,28 84,28Q79,28 79,33Q79,28 74,28Q79,28 79,23Z" fill="#FE6B1D"/>
+  <path d="M86.5,37.4Q86.5,40 89.1,40Q86.5,40 86.5,42.6Q86.5,40 83.9,40Q86.5,40 86.5,37.4Z" fill="#FE6B1D"/>
+  <path d="M25,33.6Q25,37 28.4,37Q25,37 25,40.4Q25,37 21.6,37Q25,37 25,33.6Z" fill="#FE6B1D"/>
+  <path d="M40,47V35A10,10 0 0 1 60,35V47" fill="none" stroke="#0C3622" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M48,47V35A10,10 0 0 1 68,35V47" fill="none" stroke="#0C3622" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M34.5,42L73.5,42Q76,42 76.18,44.49L78.64,79.01Q79,84 74,84L34,84Q29,84 29.36,79.01L31.82,44.49Q32,42 34.5,42Z" fill="#FE6B1D"/>
+  <path d="M32,42H76L76.25,45.5H31.75Z" fill="#FF8A45"/>
+  <path d="M69,42L73.5,42Q76,42 76.18,44.49L78.64,79.01Q79,84 74,84L71.5,84Z" fill="#E2530F"/>
+  <path d="M34.5,42L73.5,42Q76,42 76.18,44.49L78.64,79.01Q79,84 74,84L34,84Q29,84 29.36,79.01L31.82,44.49Q32,42 34.5,42Z" fill="none" stroke="#0C3622" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M47.45,59.85L51.14,53.45Q54,48.5 56.86,53.45L57.43,54.44" fill="none" stroke="#0C3622" stroke-width="6.4" stroke-linecap="butt" stroke-linejoin="round"/>
+  <path d="M53.02,56L60.57,59.88L60.98,51.4Z" fill="#0C3622" stroke="#0C3622" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M61.74,61.9L65.43,68.3Q68.29,73.25 62.57,73.25L61.43,73.25" fill="none" stroke="#0C3622" stroke-width="6.4" stroke-linecap="butt" stroke-linejoin="round"/>
+  <path d="M62.29,68.65L55.14,73.25L62.29,77.85Z" fill="#0C3622" stroke="#0C3622" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M52.81,73.25L45.43,73.25Q39.71,73.25 42.57,68.3L43.14,67.31" fill="none" stroke="#0C3622" stroke-width="6.4" stroke-linecap="butt" stroke-linejoin="round"/>
+  <path d="M46.7,70.35L46.28,61.87L38.73,65.75Z" fill="#0C3622" stroke="#0C3622" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M48,58.9L51.14,53.45Q54,48.5 56.86,53.45L57.43,54.44" fill="none" stroke="#7CB83F" stroke-width="4.2" stroke-linecap="butt" stroke-linejoin="round"/>
+  <path d="M53.02,56L60.57,59.88L60.98,51.4Z" fill="#7CB83F"/>
+  <path d="M62.29,62.85L65.43,68.3Q68.29,73.25 62.57,73.25L61.43,73.25" fill="none" stroke="#7CB83F" stroke-width="4.2" stroke-linecap="butt" stroke-linejoin="round"/>
+  <path d="M62.29,68.65L55.14,73.25L62.29,77.85Z" fill="#7CB83F"/>
+  <path d="M51.71,73.25L45.43,73.25Q39.71,73.25 42.57,68.3L43.14,67.31" fill="none" stroke="#7CB83F" stroke-width="4.2" stroke-linecap="butt" stroke-linejoin="round"/>
+  <path d="M46.7,70.35L46.28,61.87L38.73,65.75Z" fill="#7CB83F"/>
+  <path d="M50.2,65a3.8,3.8 0 1 1 7.6,0a3.8,3.8 0 1 1 -7.6,0Z" fill="#FFFFFF" stroke="#0C3622" stroke-width="1.3"/>
+</svg>

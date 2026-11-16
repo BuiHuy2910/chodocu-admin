@@ -1,5 +1,5 @@
 /* =============================================================================
-   Module: Đơn hàng
+   Module: Đơn hàng — theo dõi và can thiệp trạng thái đơn (chỉ ADMIN thấy mục này)
    ============================================================================= */
 window.PU = window.PU || {};
 PU.modules = PU.modules || {};
@@ -7,72 +7,76 @@ PU.modules = PU.modules || {};
 PU.modules.orders = (function () {
   const http = PU.http;
   const ui = PU.ui;
+  const esc = ui.esc;
+  const $ = id => document.getElementById(id);
 
-  function row(o) {
-    const code = o.orderCode || ('#' + o.id);
-    const title = (o.product && o.product.title) || '—';
-    const buyer = (o.buyer && o.buyer.fullName) || '—';
-    const seller = (o.seller && o.seller.fullName) || '—';
+  const COLUMNS = 9;
 
-    const canAccept = ['PENDING', 'DISPUTED'].indexOf(o.status) !== -1;
-    const canComplete = ['PENDING', 'ACCEPTED', 'DISPUTED'].indexOf(o.status) !== -1;
-    const canCancel = ['COMPLETED', 'CANCELLED', 'REJECTED'].indexOf(o.status) === -1;
+  // Trạng thái nào thì được chuyển sang trạng thái nào
+  const CAN_ACCEPT = ['PENDING', 'DISPUTED'];
+  const CAN_COMPLETE = ['PENDING', 'ACCEPTED', 'DISPUTED'];
+  const FINISHED = ['COMPLETED', 'CANCELLED', 'REJECTED'];
 
-    return '' +
-      '<tr>' +
-        '<td class="mono t-caption">' + ui.esc(code) + '</td>' +
-        '<td class="t-body truncate" style="max-width:220px" title="' + ui.esc(title) + '">' + ui.esc(title) + '</td>' +
-        '<td class="t-body">' + ui.esc(buyer) + '</td>' +
-        '<td class="t-body">' + ui.esc(seller) + '</td>' +
-        '<td class="is-right strong">' + ui.fmt(o.offeredPrice) + '</td>' +
-        '<td class="is-right" style="color:var(--warning);font-weight:600">' + (o.platformFeeAmount != null ? ui.fmt(o.platformFeeAmount) : '—') + '</td>' +
-        '<td class="is-right" style="color:var(--emerald);font-weight:600">' + (o.finalSellerAmount != null ? ui.fmt(o.finalSellerAmount) : '—') + '</td>' +
-        '<td>' + ui.statusBadge(o.status) + '</td>' +
-        '<td class="is-center">' +
-          '<div class="pu-row-actions">' +
-            (canAccept
-              ? '<button class="pu-btn pu-btn--ghost pu-btn--icon" title="Duyệt đơn" onclick="PU.orders.update(' + o.id + ',\'ACCEPTED\')">' +
-                  '<span class="material-symbols-outlined">check_circle</span></button>'
-              : '') +
-            (canComplete
-              ? '<button class="pu-btn pu-btn--success pu-btn--icon" title="Hoàn tất" onclick="PU.orders.update(' + o.id + ',\'COMPLETED\')">' +
-                  '<span class="material-symbols-outlined">done_all</span></button>'
-              : '') +
-            (canCancel
-              ? '<button class="pu-btn pu-btn--danger pu-btn--icon" title="Huỷ đơn" onclick="PU.orders.update(' + o.id + ',\'CANCELLED\')">' +
-                  '<span class="material-symbols-outlined">cancel</span></button>'
-              : '') +
-          '</div>' +
-        '</td>' +
-      '</tr>';
-  }
+  // Dùng để ghép câu "Ghi chú khi …"
+  const ACTION_LABEL = {
+    ACCEPTED: 'duyệt đơn',
+    COMPLETED: 'hoàn tất đơn',
+    CANCELLED: 'huỷ đơn',
+    DISPUTED: 'đánh dấu tranh chấp',
+    REJECTED: 'từ chối đơn'
+  };
 
   async function load() {
-    const tbody = document.getElementById('ordersBody');
-    tbody.innerHTML = ui.skeletonRows(9, 5);
-    const status = document.getElementById('orderStatusFilter').value;
-
+    const body = $('ordersBody');
+    body.innerHTML = ui.skeletonRows(COLUMNS, 5);
+    const status = $('orderStatusFilter').value;
     try {
-      const orders = await http.get('/admin/orders' + (status ? '?status=' + encodeURIComponent(status) : ''));
-      if (!orders || orders.length === 0) {
-        tbody.innerHTML = ui.emptyRow(9, 'Không có đơn hàng', 'Chưa có đơn nào khớp bộ lọc hiện tại.');
-        return;
-      }
-      tbody.innerHTML = orders.map(row).join('');
+      const orders = (await http.get('/admin/orders' + (status ? `?status=${encodeURIComponent(status)}` : ''))) || [];
+      body.innerHTML = orders.length
+        ? orders.map(row).join('')
+        : ui.emptyRow(COLUMNS, 'Không có đơn hàng', 'Chưa có đơn nào khớp bộ lọc hiện tại.');
     } catch (e) {
-      tbody.innerHTML = ui.emptyRow(9, 'Lỗi tải đơn hàng', e.message);
+      body.innerHTML = ui.emptyRow(COLUMNS, 'Không tải được đơn hàng', e.message);
     }
   }
 
-  const LABEL = { ACCEPTED: 'duyệt đơn', COMPLETED: 'hoàn tất đơn', CANCELLED: 'huỷ đơn', DISPUTED: 'đánh dấu tranh chấp', REJECTED: 'từ chối đơn' };
+  function row(o) {
+    const title = (o.product && o.product.title) || '—';
+    const money = value => (value != null ? ui.fmt(value) : '—');
+    return `
+      <tr>
+        <td class="mono t-caption">${esc(o.orderCode || `#${o.id}`)}</td>
+        <td class="t-body pu-cell-wide truncate" title="${esc(title)}">${esc(title)}</td>
+        <td class="t-body">${esc((o.buyer && o.buyer.fullName) || '—')}</td>
+        <td class="t-body">${esc((o.seller && o.seller.fullName) || '—')}</td>
+        <td class="is-right strong">${ui.fmt(o.offeredPrice)}</td>
+        <td class="is-right text-warn strong">${money(o.platformFeeAmount)}</td>
+        <td class="is-right text-ok strong">${money(o.finalSellerAmount)}</td>
+        <td>${ui.statusBadge(o.status)}</td>
+        <td class="is-center">${rowActions(o)}</td>
+      </tr>`;
+  }
 
+  function rowActions(o) {
+    const id = Number(o.id);
+    const button = (classes, icon, title, status) => `
+      <button class="pu-btn pu-btn--icon ${classes}" title="${title}" onclick="PU.orders.update(${id}, '${status}')">
+        <span class="material-symbols-outlined">${icon}</span>
+      </button>`;
+    const buttons = [];
+    if (CAN_ACCEPT.includes(o.status)) buttons.push(button('pu-btn--ghost', 'check_circle', 'Duyệt đơn', 'ACCEPTED'));
+    if (CAN_COMPLETE.includes(o.status)) buttons.push(button('pu-btn--success', 'done_all', 'Hoàn tất', 'COMPLETED'));
+    if (!FINISHED.includes(o.status)) buttons.push(button('pu-btn--danger', 'cancel', 'Huỷ đơn', 'CANCELLED'));
+    return `<div class="pu-row-actions">${buttons.join('')}</div>`;
+  }
+
+  // Hỏi ghi chú (không bắt buộc) rồi đổi trạng thái đơn
   function update(id, status) {
-    ui.askNote('Ghi chú khi ' + (LABEL[status] || 'cập nhật đơn'), async (note) => {
+    ui.askNote(`Ghi chú khi ${ACTION_LABEL[status] || 'cập nhật đơn'}`, async note => {
       try {
-        await http.put('/admin/orders/' + id + '/status', { status, note: note || null });
+        await http.put(`/admin/orders/${id}/status`, { status, note: note || null });
         ui.toast('Đã cập nhật trạng thái đơn hàng.', 'ok');
         load();
-        PU.modules.dashboard.load();
       } catch (e) {
         ui.toast(e.message, 'error');
       }
@@ -81,3 +85,5 @@ PU.modules.orders = (function () {
 
   return { load, update };
 })();
+
+PU.orders = PU.modules.orders;

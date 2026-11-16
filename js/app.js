@@ -1,61 +1,51 @@
 /* =============================================================================
-   Bootstrap
+   Khởi động: gắn các sự kiện dùng chung rồi khôi phục phiên đăng nhập.
+   (Mỗi module tự gắn alias PU.<tên> ở cuối file của nó.)
    ============================================================================= */
 (function () {
   const ui = PU.ui;
+  const $ = id => document.getElementById(id);
 
-  function bindGlobals() {
-    PU.modules.dashboard = PU.modules.dashboard;
-    PU.modules.pending = PU.modules.pending;
-    PU.modules.products = PU.modules.products;
-    PU.modules.orders = PU.modules.orders;
-    PU.modules.financial = PU.modules.financial;
-    PU.modules.users = PU.modules.users;
-    PU.modules.reports = PU.modules.reports;
-    PU.modules.settings = PU.modules.settings;
-  }
-
-  function hideAdminOnlyForModerator() {
-    // Chỉ ẩn khi chắc chắn là Moderator. Lúc chưa đăng nhập role = '' nên KHÔNG ẩn.
-    if (PU.auth.getRole() !== 'MODERATOR') return;
-    document.querySelectorAll('.pu-nav__item[data-nav="settings"]').forEach(el => el.classList.add('hidden'));
-  }
-
-  function bindEvents() {
-    // Enter để đăng nhập
-    ['loginEmail', 'loginPassword'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') PU.auth.login(); });
+  // Form đăng nhập: nhấn Enter hay bấm nút đều "submit" form
+  function bindLoginForm() {
+    $('loginForm').addEventListener('submit', e => {
+      e.preventDefault();
+      PU.auth.login();
     });
+  }
 
-    // ESC đóng modal + sidebar mobile
+  // Esc đóng lớp trên cùng trước: hộp thoại → ngăn kéo chi tiết → sidebar
+  // (lightbox tự xử lý Esc của riêng nó)
+  function bindEscape() {
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') {
-        ui.closeAllModals();
-        ui.closeSidebar();
-      }
-    });
-
-    // Click ra ngoài sidebar để đóng (mobile)
-    document.addEventListener('click', e => {
-      const sb = document.getElementById('sidebar');
-      if (!sb || !sb.classList.contains('is-open')) return;
-      if (sb.contains(e.target)) return;
-      if (e.target.closest('.pu-burger')) return;
+      if (e.key !== 'Escape') return;
+      if (ui.anyModalOpen()) return ui.closeAllModals();
+      PU.pending.closeDrawer();
       ui.closeSidebar();
     });
-
-    // Tự làm mới (tắt mặc định)
-    if (PU.config.REFRESH_INTERVAL_MS > 0) {
-      setInterval(() => PU.router.reload(), PU.config.REFRESH_INTERVAL_MS);
-    }
   }
 
-  document.addEventListener('DOMContentLoaded', async () => {
-    bindGlobals();
-    bindEvents();
-    PU.app = { afterLogin: hideAdminOnlyForModerator };
-    await PU.auth.restore();
-    hideAdminOnlyForModerator();
+  // Mobile: bấm ra ngoài sidebar thì đóng sidebar
+  function bindSidebarOutsideClick() {
+    document.addEventListener('click', e => {
+      const sidebar = $('sidebar');
+      if (!sidebar.classList.contains('is-open')) return;
+      if (sidebar.contains(e.target) || e.target.closest('.pu-burger')) return;
+      ui.closeSidebar();
+    });
+  }
+
+  // Tự làm mới mục đang xem theo chu kỳ (mặc định tắt, xem config.js)
+  function startAutoReload() {
+    const every = PU.config.REFRESH_INTERVAL_MS;
+    if (every > 0) setInterval(PU.router.reload, every);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    bindLoginForm();
+    bindEscape();
+    bindSidebarOutsideClick();
+    startAutoReload();
+    PU.auth.restore();
   });
 })();

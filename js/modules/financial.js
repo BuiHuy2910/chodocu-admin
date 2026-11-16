@@ -1,5 +1,6 @@
 /* =============================================================================
-   Module: Tài chính & phí sàn (cấu hình, bậc phí, giao dịch)
+   Module: Tài chính & phí sàn — cấu hình phí, bậc phí, giao dịch gần đây
+   (Chỉ ADMIN thấy mục này; backend cũng chỉ cho ADMIN gọi các API tài chính.)
    ============================================================================= */
 window.PU = window.PU || {};
 PU.modules = PU.modules || {};
@@ -7,84 +8,172 @@ PU.modules = PU.modules || {};
 PU.modules.financial = (function () {
   const http = PU.http;
   const ui = PU.ui;
+  const esc = ui.esc;
+  const $ = id => document.getElementById(id);
+
+  // Các khoá cài đặt phải là số (fee_payer là chữ: SELLER / BUYER / SPLIT)
+  const NUMERIC_KEYS = ['min_platform_fee', 'max_platform_fee', 'platform_fee_rate'];
+  // Số tiền mẫu cho bảng mô phỏng phí → hậu tố id của ô hiển thị
+  const PREVIEW_SAMPLES = [[50000, '50k'], [500000, '500k'], [2000000, '2m']];
 
   let financial = null;
   let tiers = [];
 
-  /* --------------------------- TIERS --------------------------- */
-  function tierRow(t) {
-    return '' +
-      '<tr>' +
-        '<td class="t-body strong">' + ui.esc(t.name) + '</td>' +
-        '<td class="is-right t-body">' + ui.fmt(t.minAmount) + '</td>' +
-        '<td class="is-right t-body">' + (t.maxAmount != null ? ui.fmt(t.maxAmount) : '∞') + '</td>' +
-        '<td class="is-right" style="color:var(--warning);font-weight:600">' + ui.fmtPct(t.feeRate) + '</td>' +
-        '<td class="is-right t-body">' + (t.priority != null ? t.priority : 0) + '</td>' +
-        '<td>' + (t.active
-          ? '<span class="pu-badge pu-badge--ok">Đang áp dụng</span>'
-          : '<span class="pu-badge pu-badge--neutral">Đã tắt</span>') + '</td>' +
-        '<td class="is-center">' +
-          '<div class="pu-row-actions">' +
-            '<button class="pu-btn pu-btn--ghost pu-btn--icon" title="Sửa" onclick="PU.financial.openTier(' + t.id + ')">' +
-              '<span class="material-symbols-outlined">edit</span></button>' +
-            (t.active
-              ? '<button class="pu-btn pu-btn--danger pu-btn--icon" title="Tắt bậc" onclick="PU.financial.disableTier(' + t.id + ')">' +
-                  '<span class="material-symbols-outlined">block</span></button>'
-              : '') +
-          '</div>' +
-        '</td>' +
-      '</tr>';
+  function setText(id, value) {
+    const el = $(id);
+    if (el) el.textContent = value;
   }
 
-  async function loadTiers() {
-    const tbody = document.getElementById('feeTiersBody');
-    tbody.innerHTML = ui.skeletonRows(7, 3);
+  /* --------------------------------- TẢI DỮ LIỆU ------------------------------ */
+  async function load() {
     try {
-      tiers = await http.get('/admin/fee-tiers');
-      if (!tiers || tiers.length === 0) {
-        tbody.innerHTML = ui.emptyRow(7, 'Chưa có bậc phí', 'Hệ thống đang dùng tỷ lệ cơ bản cho mọi đơn.');
-        return;
-      }
-      tbody.innerHTML = tiers.map(tierRow).join('');
+      financial = await http.get('/admin/financial');
+      showSummary(financial);
+      fillSettingInputs(financial);
+      showFeeStatus(financial.feeEnabled !== false);
+      renderTransactions(financial.recentTransactions || []);
+      refreshPreviews();
+      loadTiers();
     } catch (e) {
-      tbody.innerHTML = ui.emptyRow(7, 'Lỗi tải bậc phí', e.message);
+      ui.toast(`Không tải được dữ liệu tài chính: ${e.message}`, 'error');
     }
   }
 
+  function showSummary(fin) {
+    setText('fin-totalFee', ui.fmt(fin.totalPlatformFees));
+    setText('fin-totalValue', ui.fmt(fin.totalTransactionValue));
+    setText('fin-totalCompleted', `${ui.fmtNum(fin.totalCompletedOrders)} đơn`);
+    setText('curFeeRate', ui.fmtPct(fin.currentFeeRate || 0));
+    setText('curMinFee', ui.fmt(fin.minFee));
+    setText('curMaxFee', ui.fmt(fin.maxFee));
+  }
+
+  function fillSettingInputs(fin) {
+    $('feeRate').value = (Number(fin.currentFeeRate || 0) * 100).toFixed(1);
+    $('minFee').value = fin.minFee != null ? fin.minFee : '';
+    $('maxFee').value = fin.maxFee != null ? fin.maxFee : '';
+    if (fin.feePayer) $('feePayer').value = fin.feePayer;
+  }
+
+  function showFeeStatus(enabled) {
+    const badge = $('feeStatusBadge');
+    badge.textContent = enabled ? 'Đang thu phí' : 'Miễn phí sàn';
+    badge.className = `pu-badge ${enabled ? 'pu-badge--ok' : 'pu-badge--neutral'}`;
+  }
+
+  // Bảng mô phỏng: hỏi backend phí của vài số tiền mẫu
+  async function refreshPreviews() {
+    for (const [amount, key] of PREVIEW_SAMPLES) {
+      try {
+        const preview = await http.get(`/admin/fee/preview?amount=${amount}`);
+        setText(`preview${key}`, ui.fmt(preview.platformFeeAmount));
+        setText(`preview${key}Seller`, ui.fmt(preview.sellerReceiveAmount));
+      } catch (_) {
+        // Không mô phỏng được thì giữ dấu "—"
+      }
+    }
+  }
+
+  function renderTransactions(list) {
+    $('transactionBody').innerHTML = list.length
+      ? list.map(transactionRow).join('')
+      : ui.emptyRow(9, 'Chưa có giao dịch', 'Giao dịch được tạo khi một đơn chuyển sang Hoàn thành.');
+  }
+
+  function transactionRow(t) {
+    return `
+      <tr>
+        <td class="mono t-caption">#${esc(t.id)}</td>
+        <td class="t-body pu-cell-wide truncate">${esc(t.productTitle || '—')}</td>
+        <td class="t-body">${esc(t.buyerName || '—')}</td>
+        <td class="t-body">${esc(t.sellerName || '—')}</td>
+        <td class="is-right strong">${ui.fmt(t.transactionAmount)}</td>
+        <td class="is-right t-caption">${ui.fmtPct(t.platformFeeRate)}</td>
+        <td class="is-right text-warn strong">${ui.fmt(t.platformFeeAmount)}</td>
+        <td class="is-right text-ok strong">${ui.fmt(t.sellerReceiveAmount)}</td>
+        <td class="t-caption">${ui.fmtDate(t.createdAt)}</td>
+      </tr>`;
+  }
+
+  /* ---------------------------------- BẬC PHÍ --------------------------------- */
+  async function loadTiers() {
+    const body = $('feeTiersBody');
+    body.innerHTML = ui.skeletonRows(7, 3);
+    try {
+      tiers = (await http.get('/admin/fee-tiers')) || [];
+      body.innerHTML = tiers.length
+        ? tiers.map(tierRow).join('')
+        : ui.emptyRow(7, 'Chưa có bậc phí', 'Hệ thống đang dùng tỷ lệ cơ bản cho mọi đơn.');
+    } catch (e) {
+      body.innerHTML = ui.emptyRow(7, 'Không tải được bậc phí', e.message);
+    }
+  }
+
+  function tierRow(t) {
+    const id = Number(t.id);
+    const status = t.active
+      ? '<span class="pu-badge pu-badge--ok">Đang áp dụng</span>'
+      : '<span class="pu-badge pu-badge--neutral">Đã tắt</span>';
+    const disable = t.active
+      ? `<button class="pu-btn pu-btn--danger pu-btn--icon" title="Tắt bậc" onclick="PU.financial.disableTier(${id})">
+           <span class="material-symbols-outlined">block</span>
+         </button>`
+      : '';
+    return `
+      <tr>
+        <td class="t-body strong">${esc(t.name)}</td>
+        <td class="is-right t-body">${ui.fmt(t.minAmount)}</td>
+        <td class="is-right t-body">${t.maxAmount != null ? ui.fmt(t.maxAmount) : '∞'}</td>
+        <td class="is-right text-warn strong">${ui.fmtPct(t.feeRate)}</td>
+        <td class="is-right t-body">${t.priority != null ? t.priority : 0}</td>
+        <td>${status}</td>
+        <td class="is-center">
+          <div class="pu-row-actions">
+            <button class="pu-btn pu-btn--ghost pu-btn--icon" title="Sửa" onclick="PU.financial.openTier(${id})">
+              <span class="material-symbols-outlined">edit</span>
+            </button>
+            ${disable}
+          </div>
+        </td>
+      </tr>`;
+  }
+
+  // Không truyền id → thêm bậc mới
   function openTier(id) {
     const t = id ? tiers.find(x => x.id === id) : null;
-    document.getElementById('tierId').value = t ? t.id : '';
-    document.getElementById('tierName').value = t ? t.name : '';
-    document.getElementById('tierMin').value = t ? t.minAmount : 0;
-    document.getElementById('tierMax').value = (t && t.maxAmount != null) ? t.maxAmount : '';
-    document.getElementById('tierRate').value = t ? (Number(t.feeRate) * 100) : 3;
-    document.getElementById('tierPriority').value = t ? (t.priority != null ? t.priority : 10) : 10;
+    $('tierId').value = t ? t.id : '';
+    $('tierName').value = t ? t.name : '';
+    $('tierMin').value = t ? t.minAmount : 0;
+    $('tierMax').value = t && t.maxAmount != null ? t.maxAmount : '';
+    $('tierRate').value = t ? Number(t.feeRate) * 100 : 3;
+    $('tierPriority').value = t && t.priority != null ? t.priority : 10;
     ui.openModal('tierModal');
   }
 
-  async function saveTier() {
-    const id = document.getElementById('tierId').value;
-    const maxRaw = document.getElementById('tierMax').value;
-    const body = {
-      name: (document.getElementById('tierName').value || '').trim(),
-      minAmount: Number(document.getElementById('tierMin').value || 0),
-      maxAmount: maxRaw === '' ? null : Number(maxRaw),
-      feeRate: Number(document.getElementById('tierRate').value || 0) / 100,
-      priority: parseInt(document.getElementById('tierPriority').value || '0', 10),
+  function readTierForm() {
+    const max = $('tierMax').value;
+    return {
+      name: $('tierName').value.trim(),
+      minAmount: Number($('tierMin').value || 0),
+      maxAmount: max === '' ? null : Number(max),
+      feeRate: Number($('tierRate').value || 0) / 100,
+      priority: parseInt($('tierPriority').value || '0', 10),
       active: true
     };
+  }
 
-    if (!body.name) { ui.toast('Vui lòng nhập tên bậc phí.', 'warn'); return; }
-    if (body.maxAmount != null && body.maxAmount < body.minAmount) {
-      ui.toast('"Đến" phải lớn hơn hoặc bằng "Từ".', 'warn'); return;
+  async function saveTier() {
+    const id = $('tierId').value;
+    const tier = readTierForm();
+    if (!tier.name) return ui.toast('Vui lòng nhập tên bậc phí.', 'warn');
+    if (tier.maxAmount != null && tier.maxAmount < tier.minAmount) {
+      return ui.toast('"Đến" phải lớn hơn hoặc bằng "Từ".', 'warn');
     }
-
     try {
-      if (id) await http.put('/admin/fee-tiers/' + id, body);
-      else await http.post('/admin/fee-tiers', body);
+      if (id) await http.put(`/admin/fee-tiers/${id}`, tier);
+      else await http.post('/admin/fee-tiers', tier);
       ui.closeModal('tierModal');
       ui.toast('Đã lưu bậc phí.', 'ok');
-      loadTiers();
       load();
     } catch (e) {
       ui.toast(e.message, 'error');
@@ -92,128 +181,48 @@ PU.modules.financial = (function () {
   }
 
   function disableTier(id) {
-    ui.confirmDialog('Tắt bậc phí', 'Bậc phí sẽ không áp dụng cho đơn mới nhưng vẫn giữ lại để đối chiếu lịch sử.', async () => {
+    ui.confirmDialog('Tắt bậc phí?', 'Bậc phí không áp dụng cho đơn mới nhưng vẫn được giữ lại để đối chiếu lịch sử.', async () => {
       try {
-        await http.del('/admin/fee-tiers/' + id);
-        ui.toast('Đã tắt bậc phí.', 'warn');
+        await http.del(`/admin/fee-tiers/${id}`);
+        ui.toast('Đã tắt bậc phí.', 'ok');
         loadTiers();
       } catch (e) {
         ui.toast(e.message, 'error');
       }
-    });
+    }, { okLabel: 'Tắt bậc phí' });
   }
 
-  /* ------------------------- SETTINGS ------------------------- */
-  async function saveSetting(key, inputId) {
-    const raw = (document.getElementById(inputId).value || '').trim();
-    if (raw === '') { ui.toast('Giá trị không được để trống.', 'warn'); return; }
-
-    // Các khoá số phải là số hợp lệ; fee_payer là chuỗi (SELLER/BUYER/SPLIT)
-    const numericKeys = ['min_platform_fee', 'max_platform_fee', 'platform_fee_rate'];
-    if (numericKeys.indexOf(key) !== -1 && Number.isNaN(Number(raw))) {
-      ui.toast('Giá trị phải là số.', 'warn');
-      return;
-    }
-    await putSetting(key, raw);
+  /* --------------------------------- CÀI ĐẶT PHÍ ------------------------------ */
+  function saveSetting(key, inputId) {
+    const value = $(inputId).value.trim();
+    if (value === '') return ui.toast('Giá trị không được để trống.', 'warn');
+    if (NUMERIC_KEYS.includes(key) && Number.isNaN(Number(value))) return ui.toast('Giá trị phải là số.', 'warn');
+    putSetting(key, value);
   }
 
-  async function saveRate() {
-    const pct = Number(document.getElementById('feeRate').value);
-    if (Number.isNaN(pct) || pct < 0 || pct > 30) { ui.toast('Tỷ lệ phải trong khoảng 0–30%.', 'warn'); return; }
-    await putSetting('platform_fee_rate', (pct / 100).toString());
+  // Ô nhập theo %, backend lưu dạng tỉ lệ (5% → 0.05)
+  function saveRate() {
+    const percent = Number($('feeRate').value);
+    if (Number.isNaN(percent) || percent < 0 || percent > 30) return ui.toast('Tỷ lệ phải trong khoảng 0–30%.', 'warn');
+    putSetting('platform_fee_rate', String(percent / 100));
   }
 
-  async function putSetting(key, value) {
+  function toggleFee() {
+    const enable = !(financial && financial.feeEnabled !== false);
+    putSetting('fee_enabled', String(enable), enable ? 'Đã bật thu phí sàn.' : 'Đã tắt thu phí — miễn phí sàn.');
+  }
+
+  async function putSetting(key, value, successMessage) {
     try {
-      await http.put('/admin/settings/' + key, { value });
-      ui.toast('Đã cập nhật cài đặt.', 'ok');
+      await http.put(`/admin/settings/${key}`, { value });
+      ui.toast(successMessage || 'Đã cập nhật cài đặt.', 'ok');
       load();
     } catch (e) {
       ui.toast(e.message, 'error');
     }
   }
 
-  async function toggleFee() {
-    const enabled = !(financial && financial.feeEnabled !== false);
-    try {
-      await http.put('/admin/settings/fee_enabled', { value: enabled ? 'true' : 'false' });
-      ui.toast(enabled ? 'Đã bật thu phí sàn.' : 'Đã tắt thu phí — miễn phí sàn.', enabled ? 'ok' : 'warn');
-      load();
-    } catch (e) {
-      ui.toast(e.message, 'error');
-    }
-  }
-
-  /* --------------------------- PREVIEW ------------------------- */
-  async function refreshPreviews() {
-    const samples = [[50000, '50k'], [500000, '500k'], [2000000, '2m']];
-    for (const [amount, key] of samples) {
-      try {
-        const p = await http.get('/admin/fee/preview?amount=' + amount);
-        const feeEl = document.getElementById('preview' + key);
-        const sellerEl = document.getElementById('preview' + key + 'Seller');
-        if (feeEl) feeEl.textContent = ui.fmt(p.platformFeeAmount);
-        if (sellerEl) sellerEl.textContent = ui.fmt(p.sellerReceiveAmount);
-      } catch (_) { /* backend chưa hỗ trợ thì bỏ qua */ }
-    }
-  }
-
-  /* ----------------------------- LOAD -------------------------- */
-  async function load() {
-    try {
-      const fin = await http.get('/admin/financial');
-      financial = fin;
-
-      const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-      set('fin-totalFee', ui.fmt(fin.totalPlatformFees));
-      set('fin-totalValue', ui.fmt(fin.totalTransactionValue));
-      set('fin-totalCompleted', ui.fmtNum(fin.totalCompletedOrders) + ' đơn');
-
-      const rate = Number(fin.currentFeeRate || 0);
-      set('curFeeRate', (rate * 100).toFixed(1) + '%');
-      set('curMinFee', ui.fmt(fin.minFee));
-      set('curMaxFee', ui.fmt(fin.maxFee));
-
-      document.getElementById('feeRate').value = (rate * 100).toFixed(1);
-      document.getElementById('minFee').value = fin.minFee != null ? fin.minFee : '';
-      document.getElementById('maxFee').value = fin.maxFee != null ? fin.maxFee : '';
-      if (fin.feePayer) document.getElementById('feePayer').value = fin.feePayer;
-
-      const enabled = fin.feeEnabled !== false;
-      const badge = document.getElementById('feeStatusBadge');
-      badge.textContent = enabled ? 'Đang thu phí' : 'Miễn phí sàn';
-      badge.className = 'pu-badge ' + (enabled ? 'pu-badge--ok' : 'pu-badge--neutral');
-
-      renderTransactions(fin.recentTransactions || []);
-      refreshPreviews();
-      loadTiers();
-    } catch (e) {
-      ui.toast('Lỗi tải dữ liệu tài chính: ' + e.message, 'error');
-    }
-  }
-
-  function renderTransactions(list) {
-    const tbody = document.getElementById('transactionBody');
-    if (!list.length) {
-      tbody.innerHTML = ui.emptyRow(9, 'Chưa có giao dịch', 'Giao dịch được tạo khi một đơn chuyển sang Hoàn thành.');
-      return;
-    }
-    tbody.innerHTML = list.map(t => '' +
-      '<tr>' +
-        '<td class="mono t-caption">#' + ui.esc(t.id) + '</td>' +
-        '<td class="t-body truncate" style="max-width:200px">' + ui.esc(t.productTitle || '—') + '</td>' +
-        '<td class="t-body">' + ui.esc(t.buyerName || '—') + '</td>' +
-        '<td class="t-body">' + ui.esc(t.sellerName || '—') + '</td>' +
-        '<td class="is-right strong">' + ui.fmt(t.transactionAmount) + '</td>' +
-        '<td class="is-right t-caption">' + ui.fmtPct(t.platformFeeRate) + '</td>' +
-        '<td class="is-right" style="color:var(--warning);font-weight:600">' + ui.fmt(t.platformFeeAmount) + '</td>' +
-        '<td class="is-right" style="color:var(--emerald);font-weight:600">' + ui.fmt(t.sellerReceiveAmount) + '</td>' +
-        '<td class="t-caption">' + (t.createdAt ? ui.fmtDate(t.createdAt) : '—') + '</td>' +
-      '</tr>').join('');
-  }
-
-  return {
-    load, loadTiers, openTier, saveTier, disableTier,
-    saveSetting, saveRate, toggleFee
-  };
+  return { load, loadTiers, openTier, saveTier, disableTier, saveSetting, saveRate, toggleFee };
 })();
+
+PU.financial = PU.modules.financial;

@@ -1,13 +1,15 @@
 /* =============================================================================
-   Router: chuyển section + gọi loader tương ứng
+   Router: chuyển giữa các mục (section) và gọi hàm load() của module tương ứng
    ============================================================================= */
 window.PU = window.PU || {};
 
 PU.router = (function () {
   const ui = PU.ui;
+  const $ = id => document.getElementById(id);
 
+  // tên mục → [tiêu đề, mô tả] hiển thị trên thanh trên cùng
   const SECTIONS = {
-    dashboard: ['Tổng quan', 'Bảng điều khiển PassUni'],
+    dashboard: ['Tổng quan', 'Bảng điều khiển Chợ Đồ Cũ'],
     pending:   ['Duyệt bài đăng', 'Hàng chờ phê duyệt từ sinh viên'],
     products:  ['Sản phẩm', 'Toàn bộ sản phẩm trên sàn'],
     orders:    ['Đơn hàng', 'Theo dõi và can thiệp trạng thái đơn'],
@@ -18,48 +20,45 @@ PU.router = (function () {
   };
 
   let current = 'dashboard';
-  let loading = {};
+  const loading = {};
 
-  function loader(name) {
-    const mod = (PU.modules || {})[name];
-    return mod && typeof mod.load === 'function' ? mod.load : null;
+  // Mục gắn data-admin-only thì chỉ ADMIN được mở
+  function canOpen(name) {
+    if (!SECTIONS[name]) return false;
+    const section = $('section-' + name);
+    const adminOnly = section && section.hasAttribute('data-admin-only');
+    return !adminOnly || PU.auth.isAdmin();
   }
 
-  function paintNav(name) {
+  function showSection(name) {
+    document.querySelectorAll('.pu-section').forEach(s => s.classList.toggle('is-active', s.id === 'section-' + name));
     document.querySelectorAll('.pu-nav__item[data-nav]').forEach(el => {
       el.classList.toggle('is-active', el.getAttribute('data-nav') === name);
     });
+    const [title, subtitle] = SECTIONS[name];
+    $('pageTitle').textContent = title;
+    $('pageSubtitle').textContent = subtitle;
   }
 
-  function go(name, opts) {
-    if (!SECTIONS[name]) name = 'dashboard';
-    const options = opts || {};
-
-    current = name;
-    document.querySelectorAll('.pu-section').forEach(s => s.classList.remove('is-active'));
-    const target = document.getElementById('section-' + name);
-    if (target) target.classList.add('is-active');
-
-    const [title, sub] = SECTIONS[name];
-    document.getElementById('pageTitle').textContent = title;
-    document.getElementById('pageSubtitle').textContent = sub;
-    paintNav(name);
+  function go(name, options) {
+    const target = canOpen(name) ? name : 'dashboard';
+    current = target;
+    showSection(target);
     ui.closeSidebar();
-
-    if (options.force || !loading[name]) load(name);
+    if ((options && options.force) || !loading[target]) load(target);
   }
 
   async function load(name) {
-    const fn = loader(name);
-    if (!fn) return;
+    const module = (PU.modules || {})[name];
+    if (!module || typeof module.load !== 'function') return;
     loading[name] = true;
     try {
-      await fn();
+      await module.load();
     } catch (e) {
       ui.toast(e.message || 'Không tải được dữ liệu.', 'error');
     } finally {
       loading[name] = false;
-      document.getElementById('lastRefresh').textContent = new Date().toLocaleTimeString('vi-VN');
+      $('lastRefresh').textContent = new Date().toLocaleTimeString('vi-VN');
     }
   }
 
@@ -67,7 +66,9 @@ PU.router = (function () {
     load(current);
   }
 
-  function currentSection() { return current; }
+  function currentSection() {
+    return current;
+  }
 
   return { go, reload, load, currentSection, SECTIONS };
 })();

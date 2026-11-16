@@ -64,8 +64,9 @@ PU.http = (function () {
       const msg = (data && (data.message || data.error)) || friendly('', res.status);
       const err = new Error(friendly(msg, res.status));
       err.status = res.status;
-      if (res.status === 401) {
-        // Token hỏng/hết hạn → đăng xuất
+      // Token hỏng/hết hạn khi đang dùng app → đăng xuất.
+      // Riêng /auth/* (đăng nhập, khôi phục phiên) do auth.js tự xử lý lỗi.
+      if (res.status === 401 && !path.startsWith('/auth/')) {
         setTimeout(() => PU.auth.logout(true), 60);
       }
       throw err;
