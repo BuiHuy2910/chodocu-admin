@@ -1,10 +1,11 @@
 /* =============================================================================
-   HTTP client — gắn Bearer token, chuẩn hoá lỗi tiếng Việt
+   HTTP client — gắn Bearer token, gộp GET trùng lặp, hỗ trợ AbortController
    ============================================================================= */
 window.PU = window.PU || {};
 
 PU.http = (function () {
   const cfg = PU.config;
+  const inflightGets = new Map(); // path → Promise (chống bắn trùng GET cùng lúc)
 
   function getToken() {
     return PU._token || localStorage.getItem(cfg.TOKEN_KEY) || '';
@@ -26,6 +27,20 @@ PU.http = (function () {
     else localStorage.removeItem(cfg.ROLE_KEY);
   }
 
+  // Ghép object thành "?a=1&b=2", tự bỏ qua các tham số rỗng/null
+  function query(params) {
+    if (!params) return '';
+    const usp = new URLSearchParams();
+    Object.keys(params).forEach(key => {
+      const val = params[key];
+      if (val !== undefined && val !== null && val !== '') {
+        usp.set(key, String(val));
+      }
+    });
+    const str = usp.toString();
+    return str ? '?' + str : '';
+  }
+
   function friendly(message, status) {
     const m = String(message || '');
     if (m.includes('Failed to fetch') || m.includes('NetworkError') || m.includes('ERR_CONNECTION')) {
@@ -38,7 +53,7 @@ PU.http = (function () {
     return m || 'Yêu cầu thất bại' + (status ? ' (' + status + ')' : '') + '.';
   }
 
-  async function request(path, method, body, opts) {
+  async function sendRequest(path, method, body, opts) {
     const options = Object.assign({
       method: method || 'GET',
       headers: {
@@ -53,6 +68,11 @@ PU.http = (function () {
     try {
       res = await fetch(cfg.API_BASE + path, options);
     } catch (e) {
+      if (e && e.name === 'AbortError') {
+        const aborted = new Error('Đã huỷ yêu cầu cũ');
+        aborted.aborted = true;
+        throw aborted;
+      }
       throw new Error(friendly(e.message, 0));
     }
 
@@ -64,17 +84,26 @@ PU.http = (function () {
       const msg = (data && (data.message || data.error)) || friendly('', res.status);
       const err = new Error(friendly(msg, res.status));
       err.status = res.status;
-      // Token hỏng/hết hạn khi đang dùng app → đăng xuất.
-      // Riêng /auth/* (đăng nhập, khôi phục phiên) do auth.js tự xử lý lỗi.
       if (res.status === 401 && !path.startsWith('/auth/')) {
         setTimeout(() => PU.auth.logout(true), 60);
       }
       throw err;
     }
 
-    // Backend bọc dữ liệu trong ApiResponse { data: ... }
     if (data && typeof data === 'object' && 'data' in data && data.data !== undefined) return data.data;
     return data;
+  }
+
+  function request(path, method, body, opts) {
+    const verb = (method || 'GET').toUpperCase();
+    // Chỉ gộp các request GET không gắn AbortSignal riêng
+    if (verb === 'GET' && !(opts && opts.signal)) {
+      if (inflightGets.has(path)) return inflightGets.get(path);
+      const p = sendRequest(path, verb, null, opts).finally(() => inflightGets.delete(path));
+      inflightGets.set(path, p);
+      return p;
+    }
+    return sendRequest(path, verb, body, opts);
   }
 
   return {
@@ -82,11 +111,12 @@ PU.http = (function () {
     setToken,
     getRole,
     setRole,
-    get: (p) => request(p, 'GET'),
-    post: (p, b) => request(p, 'POST', b),
-    put: (p, b) => request(p, 'PUT', b),
-    patch: (p, b) => request(p, 'PATCH', b),
-    del: (p) => request(p, 'DELETE'),
+    query,
+    get: (p, opts) => request(p, 'GET', null, opts),
+    post: (p, b, opts) => request(p, 'POST', b, opts),
+    put: (p, b, opts) => request(p, 'PUT', b, opts),
+    patch: (p, b, opts) => request(p, 'PATCH', b, opts),
+    del: (p, opts) => request(p, 'DELETE', null, opts),
     raw: request
   };
 })();

@@ -156,29 +156,6 @@ button:focus-visible, select:focus-visible, input[type="checkbox"]:focus-visible
 .pu-password__toggle:hover { background: var(--surface-alt); color: var(--ink); }
 .pu-password__toggle .material-symbols-outlined { font-size: 19px; }
 
-/* Hộp "Tài khoản mẫu": mỗi dòng là một nút bấm để điền sẵn */
-.pu-demo-box {
-  margin-top: 22px;
-  background: var(--surface-alt);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 14px 16px;
-}
-.pu-demo-box__title { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
-.pu-demo-box__note { margin-top: 8px; font-size: 12px; color: var(--ink-3); }
-.pu-demo-box__note code { font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
-.pu-demo-row {
-  display: flex; justify-content: space-between; align-items: center; gap: 12px;
-  width: calc(100% + 16px); margin: 0 -8px; padding: 6px 8px;
-  border: 0; border-radius: var(--r-sm);
-  background: transparent; color: var(--ink-3);
-  font-size: 12px; text-align: left;
-  cursor: pointer;
-  transition: background .14s, color .14s;
-}
-.pu-demo-row:hover { background: var(--emerald-soft); color: var(--emerald); }
-.pu-demo-row code { font-family: var(--mono); color: var(--ink); font-size: 12px; overflow-wrap: anywhere; }
-
 /* ============================== SHELL =================================== */
 .pu-shell { display: none; height: 100vh; overflow: hidden; }
 .pu-shell.is-active { display: flex; }
@@ -483,6 +460,25 @@ button:focus-visible, select:focus-visible, input[type="checkbox"]:focus-visible
 .pu-cell-user__text { min-width: 0; max-width: 200px; }
 .pu-row-actions { display: flex; gap: 4px; justify-content: center; align-items: center; }
 .pu-role-select { width: 132px; }
+
+/* Thanh phân trang cuối bảng / hàng chờ */
+.pu-pager {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+.pu-pager--compact { padding: 8px 12px; gap: 6px; }
+.pu-pager__info { font-size: 12px; color: var(--ink-3); }
+.pu-pager__info b { color: var(--ink); font-weight: 600; }
+.pu-pager__controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.pu-pager__size { width: auto; min-width: 104px; padding-right: 26px; }
+.pu-pager__pages { display: inline-flex; align-items: center; gap: 4px; }
+.pu-pager__btn { min-width: 30px; padding: 0 8px; background: var(--surface); border-color: var(--border); color: var(--ink-2); }
+.pu-pager__btn:hover:not(:disabled) { background: var(--surface-alt); border-color: var(--border-strong); color: var(--ink); }
+.pu-pager__btn.is-active,
+.pu-pager__btn.is-active:hover { background: var(--emerald); border-color: var(--emerald); color: #fff; }
+.pu-pager__dots { padding: 0 4px; font-size: 12px; color: var(--ink-4); user-select: none; }
 
 /* Ô ảnh sản phẩm. Biểu tượng "không có ảnh" nằm dưới, <img> phủ lên trên;
    ảnh lỗi thì JS gỡ <img> (PU.ui.imgFail) nên biểu tượng tự lộ ra. */

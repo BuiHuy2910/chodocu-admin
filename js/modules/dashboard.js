@@ -1,5 +1,5 @@
 /* =============================================================================
-   Module: Tổng quan — số liệu chính + 2 biểu đồ (Chart.js)
+   Module: Tổng quan — 1 request duy nhất tới /admin/stats + 2 biểu đồ (Chart.js)
    ============================================================================= */
 window.PU = window.PU || {};
 PU.modules = PU.modules || {};
@@ -9,7 +9,9 @@ PU.modules.dashboard = (function () {
   const ui = PU.ui;
 
   const PALETTE = ['#0B6B4A', '#B4530A', '#0D5C8C', '#5B3E96', '#B42318', '#6B7A5E', '#8A6D3B', '#4F6B82'];
-  const charts = {};   // id canvas → biểu đồ đang vẽ (phải huỷ trước khi vẽ lại)
+  const charts = {};
+  let latestStats = null;
+  let chartListenerBound = false;
 
   function setText(id, value) {
     const el = document.getElementById(id);
@@ -17,22 +19,15 @@ PU.modules.dashboard = (function () {
   }
 
   async function load() {
-    try {
-      // Số liệu tài chính chỉ ADMIN xem được → moderator không gọi API này
-      const [stats, financial] = await Promise.all([
-        http.get('/admin/stats'),
-        PU.auth.isAdmin() ? http.get('/admin/financial').catch(() => null) : null
-      ]);
-      showStats(stats, financial);
-      ui.setBadge('pendingBadge', stats.pendingProducts);
-      drawChart('chartCategory', categoryChart(stats.productsByCategory || {}));
-      drawChart('chartUniversity', universityChart(stats.productsByUniversity || {}));
-    } catch (e) {
-      ui.toast(`Không tải được thống kê: ${e.message}`, 'error');
-    }
+    const stats = await http.get('/admin/stats');
+    latestStats = stats;
+    showStats(stats);
+    ui.setBadge('pendingBadge', stats.pendingProducts);
+    if (stats.pendingReports != null) ui.setBadge('reportBadge', stats.pendingReports);
+    paintCharts(stats);
   }
 
-  function showStats(stats, financial) {
+  function showStats(stats) {
     setText('stat-students', ui.fmtNum(stats.totalStudents));
     setText('stat-products', ui.fmtNum(stats.totalProducts));
     setText('stat-pending', ui.fmtNum(stats.pendingProducts));
@@ -40,11 +35,25 @@ PU.modules.dashboard = (function () {
     setText('stat-approved', ui.fmtNum(stats.approvedProducts));
     setText('stat-intransaction', ui.fmtNum(stats.inTransactionProducts));
     setText('stat-sold', ui.fmtNum(stats.soldProducts));
-    setText('stat-revenue', financial ? ui.fmt(financial.totalPlatformFees) : '—');
+    setText('stat-revenue', stats.totalPlatformFees != null ? ui.fmt(stats.totalPlatformFees) : '—');
   }
 
   /* --------------------------------- BIỂU ĐỒ --------------------------------- */
-  // Không tải được thư viện Chart.js (mất mạng) thì bỏ qua, các số liệu vẫn hiện
+  function paintCharts(stats) {
+    if (typeof window.Chart === 'undefined') {
+      const script = document.getElementById('chartScript');
+      if (script && !chartListenerBound) {
+        chartListenerBound = true;
+        script.addEventListener('load', () => {
+          if (latestStats) paintCharts(latestStats);
+        });
+      }
+      return;
+    }
+    drawChart('chartCategory', categoryChart(stats.productsByCategory || {}));
+    drawChart('chartUniversity', universityChart(stats.productsByUniversity || {}));
+  }
+
   function drawChart(canvasId, config) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || typeof window.Chart === 'undefined') return;

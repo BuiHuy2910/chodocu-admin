@@ -17,8 +17,8 @@ python -m http.server 5500
 # -> http://localhost:5500
 ```
 
-Tài khoản mẫu (có sẵn sau khi chạy `seed_data.sql`). Trên màn đăng nhập, bấm vào
-một dòng "Tài khoản mẫu" để điền sẵn email + mật khẩu.
+Tài khoản mẫu (có sẵn sau khi chạy `seed_data.sql`). Màn đăng nhập không hiển thị
+các tài khoản này, nhập tay email + mật khẩu:
 
 | Vai trò | Email | Mật khẩu |
 |---|---|---|
@@ -141,13 +141,14 @@ ví dụ `16/11/2026 21:03`) và `createdAtIso` chuẩn ISO có `Z` (ví dụ `2
 | Nhóm | Endpoint |
 |---|---|
 | Auth | `POST /auth/login`, `GET /auth/me` (khôi phục phiên khi tải lại trang) |
-| Thống kê | `GET /admin/stats`, `GET /admin/financial` (chỉ Admin) |
-| Sản phẩm | `GET /admin/products?status=`, `GET /admin/products/{id}`, `DELETE /admin/products/{id}` (chỉ Admin), `PUT /admin/products/{id}/hide?hidden=true\|false` |
+| Thống kê | `GET /admin/stats` (tổng hợp SQL + số báo cáo chờ + tổng phí sàn cho Admin) |
+| Hàng chờ duyệt | `GET /admin/products/pending-queue?page=&size=&keyword=&category=&school=&sort=` (gộp tin chờ + thống kê người bán + lịch sử trong 1 request) |
+| Sản phẩm | `GET /admin/products?page=&size=&status=&keyword=`, `GET /admin/products/{id}`, `DELETE /admin/products/{id}` (chỉ Admin), `PUT /admin/products/{id}/hide?hidden=true\|false` |
 | Kiểm duyệt | `PUT /admin/products/{id}/approve`, `PUT /admin/products/{id}/reject` `{reason}` |
 | Hàng loạt | `PUT /admin/products/bulk-approve` `{ids}`, `PUT /admin/products/bulk-reject` `{ids, reason}` → `{processed, skipped}` |
-| Lịch sử | `GET /admin/products/{id}/logs` → `[{id, action, reason, moderatorName, createdAt}]`, `GET /admin/moderation-logs` |
-| Đơn hàng | `GET /admin/orders?status=`, `PUT /admin/orders/{id}/status` `{status, note}` |
-| Phí sàn | `GET/POST/PUT/DELETE /admin/fee-tiers`, `GET /admin/fee/preview?amount=` |
+| Lịch sử | `GET /admin/products/{id}/logs`, `GET /admin/moderation-logs?page=&size=` |
+| Đơn hàng | `GET /admin/orders?page=&size=&status=&keyword=`, `PUT /admin/orders/{id}/status` `{status, note}` |
+| Phí sàn & GD | `GET /admin/financial?page=&size=` (gộp bậc phí + mô phỏng + trang GD), `GET /admin/transactions?page=&size=`, `GET/POST/PUT/DELETE /admin/fee-tiers`, `GET /admin/fee/preview?amount=` |
 | Cài đặt | `GET /admin/settings`, `PUT /admin/settings/{key}` `{value}` |
-| Người dùng | `GET /admin/users`, `PUT /admin/users/{id}/toggle-active`, `PUT /admin/users/{id}/role` `{role}` |
-| Báo cáo | `GET /admin/reports?status=`, `PUT /admin/reports/{id}/resolve` `{action, note}` |
+| Người dùng | `GET /admin/users?page=&size=&role=&keyword=`, `PUT /admin/users/{id}/toggle-active`, `PUT /admin/users/{id}/role` `{role}` |
+| Báo cáo | `GET /admin/reports?page=&size=&status=&keyword=`, `PUT /admin/reports/{id}/resolve` `{action, note}` |

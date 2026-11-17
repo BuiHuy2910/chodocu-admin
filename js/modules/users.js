@@ -1,6 +1,5 @@
 /* =============================================================================
-   Module: Người dùng — khoá / mở khoá tài khoản, phân quyền
-   (Chỉ ADMIN thấy mục này; backend cũng chỉ cho ADMIN khoá tài khoản / đổi vai trò.)
+   Module: Người dùng — phân trang server-side + tìm kiếm debounce + khoá / đổi quyền
    ============================================================================= */
 window.PU = window.PU || {};
 PU.modules = PU.modules || {};
@@ -8,41 +7,66 @@ PU.modules = PU.modules || {};
 PU.modules.users = (function () {
   const http = PU.http;
   const ui = PU.ui;
+  const cfg = PU.config;
   const esc = ui.esc;
   const $ = id => document.getElementById(id);
 
   const COLUMNS = 9;
 
-  // Vai trò → tên hiển thị trong ô "Đổi vai trò"
   const ROLE_LABELS = {
     STUDENT: 'Sinh viên',
     MODERATOR: 'Kiểm duyệt viên',
     ADMIN: 'Quản trị viên'
   };
 
-  let all = [];
+  let items = [];
+  let page = 0;
+  let size = cfg.DEFAULT_PAGE_SIZE || 15;
+  let aborter = null;
+
+  const debouncedSearch = ui.debounce(() => {
+    page = 0;
+    load();
+  }, 300);
+
+  function onSearch() {
+    debouncedSearch();
+  }
+
+  function onFilterChange() {
+    page = 0;
+    load();
+  }
 
   /* ---------------------------------- BẢNG ---------------------------------- */
   async function load() {
-    $('usersBody').innerHTML = ui.skeletonRows(COLUMNS, 6);
-    try {
-      all = (await http.get('/admin/users')) || [];
-      filter();
-    } catch (e) {
-      $('usersBody').innerHTML = ui.emptyRow(COLUMNS, 'Không tải được người dùng', e.message);
-    }
-  }
+    if (aborter) aborter.abort();
+    aborter = new AbortController();
 
-  // Lọc theo vai trò + tìm không phân biệt dấu (tên, email, mã sinh viên)
-  function filter() {
-    const query = ui.normalize($('userSearch').value);
+    const body = $('usersBody');
+    body.innerHTML = ui.skeletonRows(COLUMNS, 6);
     const role = $('userRoleFilter').value;
-    const list = all.filter(u =>
-      (!role || u.role === role) &&
-      (!query || ui.normalize(`${u.fullName || ''} ${u.email || ''} ${u.studentId || ''}`).includes(query)));
-    $('usersBody').innerHTML = list.length
-      ? list.map(row).join('')
-      : ui.emptyRow(COLUMNS, 'Không tìm thấy người dùng', 'Thử đổi từ khoá hoặc bộ lọc vai trò.');
+    const keyword = $('userSearch').value.trim();
+
+    try {
+      const data = await http.get('/admin/users' + http.query({ role, keyword, page, size }), {
+        signal: aborter.signal
+      });
+      items = (data && data.content) || [];
+      body.innerHTML = items.length
+        ? items.map(row).join('')
+        : ui.emptyRow(COLUMNS, 'Không tìm thấy người dùng', 'Thử đổi từ khoá hoặc bộ lọc vai trò.');
+
+      ui.renderPager('usersPager', data, {
+        unit: 'người dùng',
+        onPage: next => { page = next; load(); },
+        onSize: nextSize => { size = nextSize; page = 0; load(); }
+      });
+    } catch (e) {
+      if (e && e.aborted) return;
+      body.innerHTML = ui.emptyRow(COLUMNS, 'Không tải được người dùng', e.message);
+      ui.renderPager('usersPager', null);
+    }
   }
 
   function row(u) {
@@ -86,7 +110,6 @@ PU.modules.users = (function () {
       </div>`;
   }
 
-  // Ô đổi vai trò (không liệt kê vai trò hiện tại của người dùng)
   function roleSelect(u) {
     const options = Object.keys(ROLE_LABELS).filter(role => role !== u.role)
       .map(role => `<option value="${role}">${ROLE_LABELS[role]}</option>`).join('');
@@ -99,7 +122,7 @@ PU.modules.users = (function () {
 
   /* -------------------------------- THAO TÁC --------------------------------- */
   function toggleActive(id) {
-    const user = all.find(u => u.id === id);
+    const user = items.find(u => u.id === id);
     const willLock = !(user && user.active === false);
     ui.confirmDialog(
       willLock ? 'Khoá tài khoản?' : 'Mở khoá tài khoản?',
@@ -111,25 +134,25 @@ PU.modules.users = (function () {
 
   function changeRole(id, select) {
     const role = select.value;
-    select.value = '';            // trả ô chọn về "Đổi vai trò…" dù xác nhận hay huỷ
+    select.value = '';
     if (!role) return;
     ui.confirmDialog('Đổi vai trò?', `Người dùng này sẽ trở thành ${ROLE_LABELS[role] || role}.`,
       () => send(`/admin/users/${id}/role`, { role }, 'Đã cập nhật vai trò.'),
       { okLabel: 'Đổi vai trò', tone: 'primary' });
   }
 
-  // Gọi API rồi tải lại bảng
   async function send(path, body, successMessage) {
     try {
       await http.put(path, body);
       ui.toast(successMessage, 'ok');
+      PU.router.invalidate('dashboard');
       load();
     } catch (e) {
       ui.toast(e.message, 'error');
     }
   }
 
-  return { load, filter, toggleActive, changeRole };
+  return { load, onSearch, onFilterChange, toggleActive, changeRole };
 })();
 
 PU.users = PU.modules.users;

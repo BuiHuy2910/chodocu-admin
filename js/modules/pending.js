@@ -1,12 +1,10 @@
 /* =============================================================================
-   Module: Duyệt bài đăng (hàng chờ PENDING)
-   Bố cục 2 cột: bên trái là hàng chờ (đăng trước → duyệt trước), bên phải là
-   chi tiết tin đang chọn. Màn hình hẹp: cột chi tiết thành ngăn kéo trượt ra.
-
-   Phần duyệt bài chia làm 3 file cho dễ đọc:
-     pending-checks.js  cảnh báo tự động (chỉ để tham khảo)
-     pending-view.js    dựng HTML
-     pending.js         (file này) trạng thái, gọi API, phím tắt
+   Module: Duyệt bài đăng (hàng chờ PENDING) — phân trang + gộp 1 request duy nhất
+   Tải 1 trang từ /admin/products/pending-queue kèm sẵn:
+     - danh mục & trường có trong hàng chờ
+     - thống kê số tin của từng người bán
+     - danh sách tiêu đề tin cùng người bán (để báo trùng)
+     - lịch sử kiểm duyệt của các tin trong trang (di chuyển J/K 0 tốn request)
    ============================================================================= */
 window.PU = window.PU || {};
 PU.modules = PU.modules || {};
@@ -14,112 +12,151 @@ PU.modules = PU.modules || {};
 PU.modules.pending = (function () {
   const http = PU.http;
   const ui = PU.ui;
+  const cfg = PU.config;
   const product = PU.product;
   const checks = PU.pendingChecks;
   const view = PU.pendingView;
   const $ = id => document.getElementById(id);
 
-  // Dưới bề rộng này cột chi tiết thành ngăn kéo (khớp với @media trong admin.css)
   const NARROW = window.matchMedia('(max-width: 1100px)');
-  const MAX_REASON = 255;   // backend giới hạn lý do từ chối 255 ký tự
-  const BULK_LIMIT = 100;   // backend xử lý tối đa 100 tin mỗi lần
+  const MAX_REASON = 255;
+  const BULK_LIMIT = 100;
 
   /* -------------------------------- TRẠNG THÁI ------------------------------ */
   const state = {
     phase: 'idle',          // 'idle' | 'loading' | 'ready' | 'error'
     error: '',
-    queue: [],              // các tin đang chờ duyệt
-    allProducts: [],        // mọi tin trên sàn (để thống kê người bán, tìm tin trùng)
-    allLoaded: false,       // tải được danh sách mọi tin hay chưa
-    bySeller: new Map(),    // id người bán → các tin của người đó
-    issues: new Map(),      // id tin → cảnh báo tự động (tính khi cần rồi nhớ lại)
-    logs: new Map(),        // id tin → lịch sử kiểm duyệt đã tải
+    page: 0,
+    size: cfg.PENDING_PAGE_SIZE || 20,
+    totalElements: 0,
+    totalPages: 0,
+    totalPending: 0,
+    queue: [],              // các tin của trang hiện tại
+    categories: [],
+    schools: [],
+    sellerStats: new Map(), // sellerId → { total, approved, rejected, pending }
+    siblings: new Map(),    // sellerId → [{ id, title, status }]
+    issues: new Map(),      // productId → cảnh báo tự động
+    logs: new Map(),        // productId → lịch sử kiểm duyệt (đã tải sẵn từ pending-queue)
     selectedId: null,
     imageIndex: 0,
-    checked: new Set(),     // các tin được tick để xử lý hàng loạt
-    skipped: new Map(),     // id tin → thứ tự bị "bỏ qua" (tin bỏ qua xếp xuống cuối)
-    busy: false,            // đang chờ API duyệt / từ chối
-    rejectIds: []           // (các) tin đang mở hộp thoại từ chối
+    checked: new Set(),
+    skipped: new Map(),
+    busy: false,
+    rejectIds: []
   };
   let skipCounter = 0;
+  let aborter = null;
+
+  const debouncedSearch = ui.debounce(() => {
+    state.page = 0;
+    load();
+  }, 300);
+
+  function onSearch() {
+    debouncedSearch();
+  }
 
   /* ------------------------------- TẢI DỮ LIỆU ------------------------------ */
-  // Danh sách mọi tin chỉ dùng để thống kê, nên lỗi thì bỏ qua (trả null)
-  function fetchData() {
-    return Promise.all([
-      http.get('/admin/products?status=PENDING'),
-      http.get('/admin/products').catch(() => null)
-    ]);
+  function readFilters() {
+    return {
+      keyword: ($('pqSearch') && $('pqSearch').value.trim()) || '',
+      category: ($('pqCategory') && $('pqCategory').value) || '',
+      school: ($('pqSchool') && $('pqSchool').value) || '',
+      sort: ($('pqSort') && $('pqSort').value) || 'oldest'
+    };
+  }
+
+  function fetchQueue(signal) {
+    const f = readFilters();
+    return http.get('/admin/products/pending-queue' + http.query({
+      keyword: f.keyword,
+      category: f.category,
+      school: f.school,
+      sort: f.sort,
+      page: state.page,
+      size: state.size
+    }), signal ? { signal } : undefined);
   }
 
   async function load() {
     if (state.busy) return;
+    if (aborter) aborter.abort();
+    aborter = new AbortController();
+
     closeDrawer();
     state.phase = 'loading';
     render();
     try {
-      const [pending, all] = await fetchData();
-      setData(pending, all);
+      const payload = await fetchQueue(aborter.signal);
+      setData(payload);
       state.phase = 'ready';
     } catch (e) {
-      setData([], null);
+      if (e && e.aborted) return;
+      setData(null);
       state.phase = 'error';
       state.error = e.message || 'Lỗi không xác định.';
     }
     render();
   }
 
-  // Làm mới ngầm (tự làm mới, sau thao tác hàng loạt): không hiện khung chờ,
-  // giữ nguyên cột chi tiết nếu tin đang xem vẫn còn trong hàng chờ.
   async function refreshQuietly(options) {
     if (state.busy || state.phase !== 'ready') return;
     const before = new Set(state.queue.map(p => p.id));
+    const prevTotal = state.totalPending;
     try {
-      const [pending, all] = await fetchData();
-      if (state.busy) return;   // trong lúc chờ đã có thao tác khác → bỏ kết quả cũ này
-      setData(pending, all);
-      const added = state.queue.filter(p => !before.has(p.id)).length;
-      if (options && options.announce && added) ui.toast(`Có ${added} tin mới chờ duyệt.`, 'info');
+      const payload = await fetchQueue();
+      if (state.busy) return;
+      setData(payload);
+      const added = Math.max(0, state.totalPending - prevTotal) || state.queue.filter(p => !before.has(p.id)).length;
+      if (options && options.announce && added > 0) ui.toast(`Có ${added} tin mới chờ duyệt.`, 'info');
       render({ keepReview: true });
-    } catch (e) {
-      // Làm mới ngầm thất bại thì giữ dữ liệu đang có, lần sau thử lại
+    } catch (_) {
+      // Làm mới ngầm thất bại thì giữ nguyên dữ liệu hiện có
     }
   }
 
-  function setData(pending, all) {
-    state.queue = pending || [];
-    state.allLoaded = Array.isArray(all);
-    state.allProducts = mergeById(all || [], state.queue);
-    state.bySeller = groupBySeller(state.allProducts);
-    state.issues.clear();
+  function setData(payload) {
+    const pageObj = (payload && payload.page) || {};
+    state.queue = pageObj.content || [];
+    state.page = pageObj.pageNumber || 0;
+    state.size = pageObj.pageSize || state.size;
+    state.totalElements = pageObj.totalElements || 0;
+    state.totalPages = pageObj.totalPages || 0;
+    state.totalPending = payload && payload.totalPending != null ? payload.totalPending : state.totalElements;
+    state.categories = (payload && payload.categories) || [];
+    state.schools = (payload && payload.schools) || [];
+
+    state.sellerStats.clear();
+    if (payload && payload.sellerStats) {
+      Object.keys(payload.sellerStats).forEach(sid => {
+        state.sellerStats.set(Number(sid), payload.sellerStats[sid]);
+      });
+    }
+
+    state.siblings.clear();
+    if (payload && payload.sellerSiblings) {
+      Object.keys(payload.sellerSiblings).forEach(sid => {
+        state.siblings.set(Number(sid), payload.sellerSiblings[sid] || []);
+      });
+    }
+
     state.logs.clear();
+    if (payload && payload.logsByProduct) {
+      Object.keys(payload.logsByProduct).forEach(pid => {
+        state.logs.set(Number(pid), payload.logsByProduct[pid] || []);
+      });
+    }
+
+    state.issues.clear();
     forgetMissing();
     fillFilterOptions();
   }
 
-  // Gộp 2 danh sách theo id, bản ghi trong `latest` được ưu tiên
-  function mergeById(base, latest) {
-    const byId = new Map(base.map(p => [p.id, p]));
-    latest.forEach(p => byId.set(p.id, p));
-    return Array.from(byId.values());
-  }
-
-  function groupBySeller(list) {
-    const groups = new Map();
-    list.forEach(p => {
-      const sellerId = product.seller(p).id;
-      if (sellerId == null) return;
-      if (!groups.has(sellerId)) groups.set(sellerId, []);
-      groups.get(sellerId).push(p);
-    });
-    return groups;
-  }
-
-  // Bỏ dấu tick / "bỏ qua" của những tin không còn trong hàng chờ
   function forgetMissing() {
     const inQueue = new Set(state.queue.map(p => p.id));
     state.checked.forEach(id => { if (!inQueue.has(id)) state.checked.delete(id); });
-    state.skipped.forEach((order, id) => { if (!inQueue.has(id)) state.skipped.delete(id); });
+    state.skipped.forEach((_, id) => { if (!inQueue.has(id)) state.skipped.delete(id); });
   }
 
   /* --------------------------- DỮ LIỆU CỦA MỘT TIN -------------------------- */
@@ -128,17 +165,19 @@ PU.modules.pending = (function () {
   }
 
   function findProduct(id) {
-    return state.allProducts.find(p => p.id === id) || null;
+    return state.queue.find(p => p.id === id)
+      || (PU.products && PU.products.findItem && PU.products.findItem(id))
+      || null;
   }
 
-  // “Tên tin” (hoặc "tin #12" khi chưa có dữ liệu) để ghép vào thông báo
   function nameOf(id) {
     const p = findProduct(id);
     return p ? `“${p.title}”` : `tin #${id}`;
   }
 
   function sellerProducts(p) {
-    return state.bySeller.get(product.seller(p).id) || [p];
+    const sid = product.seller(p).id;
+    return (sid != null && state.siblings.get(Number(sid))) || [p];
   }
 
   function issuesOf(p) {
@@ -148,16 +187,18 @@ PU.modules.pending = (function () {
     return state.issues.get(p.id);
   }
 
-  // Đếm tin của người bán theo trạng thái
   function sellerStats(p) {
-    const list = sellerProducts(p);
-    const count = test => list.filter(test).length;
-    return {
-      total: list.length,
-      approved: count(product.isApproved),
-      rejected: count(x => x.status === 'REJECTED'),
-      pending: count(x => x.status === 'PENDING')
-    };
+    const sid = product.seller(p).id;
+    const s = sid != null ? state.sellerStats.get(Number(sid)) : null;
+    if (s) {
+      return {
+        total: s.total || 0,
+        approved: s.approved || 0,
+        rejected: s.rejected || 0,
+        pending: s.pending || 0
+      };
+    }
+    return { total: 1, approved: 0, rejected: 0, pending: 1 };
   }
 
   /* ------------------------------ LỌC & SẮP XẾP ----------------------------- */
@@ -166,97 +207,73 @@ PU.modules.pending = (function () {
     return date ? date.getTime() : 0;
   }
 
-  // Mỗi cảnh báo nặng tính 10 điểm, cảnh báo nhẹ 1 điểm
   function riskOf(p) {
     return issuesOf(p).reduce((sum, item) => sum + (item.level === 'danger' ? 10 : 1), 0);
   }
 
   const SORTERS = {
-    oldest: (a, b) => timeOf(a) - timeOf(b) || a.id - b.id,    // đăng trước → duyệt trước
+    oldest: (a, b) => timeOf(a) - timeOf(b) || a.id - b.id,
     newest: (a, b) => timeOf(b) - timeOf(a) || b.id - a.id,
     risk: (a, b) => riskOf(b) - riskOf(a) || SORTERS.oldest(a, b),
     'price-asc': (a, b) => Number(a.price) - Number(b.price),
     'price-desc': (a, b) => Number(b.price) - Number(a.price)
   };
 
-  function readFilters() {
-    return {
-      text: ui.normalize($('pqSearch').value),
-      category: $('pqCategory').value,
-      school: $('pqSchool').value,
-      sort: $('pqSort').value
-    };
-  }
-
-  function matches(p, filters) {
-    if (filters.category && product.category(p) !== filters.category) return false;
-    if (filters.school && product.school(p) !== filters.school) return false;
-    if (!filters.text) return true;
-    const seller = product.seller(p);
-    const text = `#${p.id} ${p.title} ${p.description || ''} ${seller.fullName || ''} ${seller.email || ''}`;
-    return ui.normalize(text).includes(filters.text);
-  }
-
-  // Danh sách đang hiển thị: lọc → sắp xếp → các tin "bỏ qua" xuống cuối
   function visibleItems() {
-    const filters = readFilters();
-    const sorter = SORTERS[filters.sort] || SORTERS.oldest;
-    return state.queue
-      .filter(p => matches(p, filters))
-      .sort((a, b) => skipOrder(a) - skipOrder(b) || sorter(a, b));
+    const sort = ($('pqSort') && $('pqSort').value) || 'oldest';
+    const sorter = SORTERS[sort] || SORTERS.oldest;
+    return state.queue.slice().sort((a, b) => skipOrder(a) - skipOrder(b) || sorter(a, b));
   }
 
-  // 0 = chưa bỏ qua; tin bị bỏ qua càng muộn thì số càng lớn → càng nằm sau
   function skipOrder(p) {
     return state.skipped.get(p.id) || 0;
   }
 
   function applyFilters() {
-    render({ keepReview: true });
+    state.page = 0;
+    load();
   }
 
   function clearFilters() {
     $('pqSearch').value = '';
     $('pqCategory').value = '';
     $('pqSchool').value = '';
-    applyFilters();
+    state.page = 0;
+    load();
   }
 
-  // Ô lọc danh mục / trường chỉ liệt kê những giá trị đang có trong hàng chờ
   function fillFilterOptions() {
-    fillSelect('pqCategory', state.queue.map(p => product.category(p)), 'Tất cả danh mục');
-    fillSelect('pqSchool', state.queue.map(p => product.school(p)), 'Tất cả trường');
+    fillSelect('pqCategory', state.categories, 'Tất cả danh mục');
+    fillSelect('pqSchool', state.schools, 'Tất cả trường');
   }
 
   function fillSelect(id, values, allLabel) {
     const select = $(id);
+    if (!select) return;
     const current = select.value;
-    const options = Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b, 'vi'));
+    const options = Array.from(new Set((values || []).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'vi'));
+    if (current && !options.includes(current)) options.unshift(current);
     select.innerHTML = `<option value="">${allLabel}</option>` +
       options.map(v => `<option value="${ui.esc(v)}">${ui.esc(v)}</option>`).join('');
-    select.value = options.includes(current) ? current : '';
+    select.value = current;
   }
 
   /* ------------------------------- VẼ GIAO DIỆN ----------------------------- */
-  // options.keepReview: không vẽ lại cột chi tiết nếu tin đang xem vẫn còn
-  // (tránh giật màn hình và mất vị trí cuộn khi chỉ đổi bộ lọc / làm mới ngầm)
   function render(options) {
     const items = visibleItems();
     const selectionChanged = ensureSelection(items);
     syncBadge();
     renderToolbar(items);
     renderQueue(items);
+    renderPager();
     if (selectionChanged || !(options && options.keepReview)) renderReview(items);
     else renderPosition(items);
   }
 
-  // Số cạnh menu "Duyệt bài đăng". Chỉ cập nhật khi đã tải được hàng chờ thật
-  // (VD: duyệt từ mục Sản phẩm khi chưa mở mục này thì không ghi đè thành 0).
   function syncBadge() {
-    if (state.phase === 'ready') ui.setBadge('pendingBadge', state.queue.length);
+    if (state.phase === 'ready') ui.setBadge('pendingBadge', state.totalPending);
   }
 
-  // Giữ tin đang chọn nếu nó còn hiển thị, không thì chọn tin đầu tiên
   function ensureSelection(items) {
     if (state.selectedId !== null && items.some(p => p.id === state.selectedId)) return false;
     state.selectedId = items.length ? items[0].id : null;
@@ -265,10 +282,11 @@ PU.modules.pending = (function () {
   }
 
   function renderToolbar(items) {
-    const total = state.queue.length;
-    $('pqCount').textContent = items.length === total
-      ? `${total} tin chờ duyệt`
-      : `${items.length}/${total} tin khớp bộ lọc`;
+    const f = readFilters();
+    const filtered = !!(f.keyword || f.category || f.school);
+    $('pqCount').textContent = !filtered
+      ? `${ui.fmtNum(state.totalPending)} tin chờ duyệt`
+      : `${ui.fmtNum(state.totalElements)}/${ui.fmtNum(state.totalPending)} tin khớp bộ lọc`;
     renderCheckAll(items);
     renderBulkBar();
     const loading = state.phase === 'loading';
@@ -295,11 +313,33 @@ PU.modules.pending = (function () {
     $('pqList').innerHTML = queueHtml(items);
   }
 
+  function renderPager() {
+    if (state.phase !== 'ready' || state.totalElements <= 0) {
+      ui.renderPager('pqPager', null);
+      return;
+    }
+    ui.renderPager('pqPager', {
+      pageNumber: state.page,
+      pageSize: state.size,
+      totalElements: state.totalElements,
+      totalPages: Math.max(state.totalPages, Math.ceil(state.totalElements / state.size))
+    }, {
+      compact: true,
+      unit: 'tin',
+      sizes: [15, 20, 50],
+      onPage: next => { state.page = next; load(); },
+      onSize: nextSize => { state.size = nextSize; state.page = 0; load(); }
+    });
+  }
+
   function queueHtml(items) {
+    const f = readFilters();
+    const hasFilter = !!(f.keyword || f.category || f.school);
     if (state.phase === 'error') return view.loadError(state.error);
     if (state.phase === 'loading' && !state.queue.length) return view.queueSkeleton();
-    if (!state.queue.length) return view.queueEmpty();
-    if (!items.length) return view.noMatch();
+    if (!state.totalPending && !items.length) return view.queueEmpty();
+    if (!items.length && hasFilter) return view.noMatch();
+    if (!items.length) return view.queueEmpty();
     return items.map(p => view.queueRow(p, {
       active: p.id === state.selectedId,
       checked: state.checked.has(p.id),
@@ -316,13 +356,14 @@ PU.modules.pending = (function () {
       box.innerHTML = emptyReviewHtml();
       return;
     }
+    const offset = state.page * state.size;
     box.innerHTML = view.review(p, {
-      position: items.findIndex(x => x.id === p.id) + 1,
-      total: items.length,
+      position: offset + items.findIndex(x => x.id === p.id) + 1,
+      total: Math.max(state.totalElements, items.length),
       imageIndex: state.imageIndex,
       issues: issuesOf(p),
       sellerStats: sellerStats(p),
-      statsComplete: state.allLoaded,
+      statsComplete: true,
       busy: state.busy
     });
     box.scrollTop = 0;
@@ -332,17 +373,19 @@ PU.modules.pending = (function () {
   function emptyReviewHtml() {
     if (state.phase === 'loading') return view.reviewLoading();
     if (state.phase === 'error') return view.reviewEmpty('error');
-    return view.reviewEmpty(state.queue.length ? 'pick' : 'done');
+    return view.reviewEmpty(state.totalPending ? 'pick' : 'done');
   }
 
-  // Chỉ cập nhật số thứ tự "3/12" trên thanh chi tiết
   function renderPosition(items) {
     const el = $('pqPos');
-    if (el) el.textContent = `${items.findIndex(p => p.id === state.selectedId) + 1}/${items.length}`;
+    if (!el) return;
+    const idx = items.findIndex(p => p.id === state.selectedId);
+    if (idx >= 0) {
+      el.textContent = `${state.page * state.size + idx + 1}/${Math.max(state.totalElements, items.length)}`;
+    }
   }
 
   /* ---------------------------- CHỌN TIN & DI CHUYỂN ------------------------ */
-  // fromClick = true khi bấm vào hàng chờ → màn hình hẹp thì mở ngăn kéo chi tiết
   function select(id, fromClick) {
     if (id !== state.selectedId) {
       state.selectedId = id;
@@ -366,16 +409,14 @@ PU.modules.pending = (function () {
   function next() { move(1); }
   function prev() { move(-1); }
 
-  // "Bỏ qua": đẩy tin đang xem xuống cuối hàng chờ rồi chuyển sang tin kế tiếp
   function skip() {
     const id = state.selectedId;
     if (id === null) return;
     const index = visibleItems().findIndex(p => p.id === id);
     state.skipped.set(id, ++skipCounter);
     const items = visibleItems();
-    // Tin vừa bỏ qua đã xuống cuối nên tin kế tiếp giờ nằm đúng vị trí cũ của nó
     const following = items[index] && items[index].id !== id ? items[index] : items[0];
-    state.selectedId = following.id;
+    state.selectedId = following ? following.id : null;
     state.imageIndex = 0;
     render();
     scrollToSelected();
@@ -411,7 +452,7 @@ PU.modules.pending = (function () {
     if (p) PU.lightbox.open(product.images(p), state.imageIndex);
   }
 
-  // Lịch sử kiểm duyệt của tin đang xem (tải một lần rồi nhớ lại)
+  // Lịch sử đã được gộp sẵn trong pending-queue; chỉ gọi lẻ nếu chưa có trong Map
   async function showLogs(id) {
     if (state.logs.has(id)) return paintLogs(id, ui.historyList(state.logs.get(id)));
     try {
@@ -425,25 +466,23 @@ PU.modules.pending = (function () {
 
   function paintLogs(id, html) {
     const box = $('pqLogs');
-    if (box && id === state.selectedId) box.innerHTML = html;   // bỏ qua nếu đã chuyển sang tin khác
+    if (box && id === state.selectedId) box.innerHTML = html;
   }
 
   /* ----------------------------- DUYỆT / TỪ CHỐI ---------------------------- */
-  // Đang tải lại hàng chờ hoặc đang chờ API thì tạm khoá thao tác
   function canAct() {
     return !state.busy && state.phase !== 'loading';
   }
 
-  // Không truyền id → xử lý tin đang xem (dùng cho phím tắt và thanh chi tiết).
-  // Mục Sản phẩm cũng gọi hai hàm này để duyệt / từ chối từ cửa sổ chi tiết.
   function approve(id) {
     const target = Number(id) || state.selectedId;
     if (!target || !canAct()) return;
+    const label = nameOf(target);
     optimistic({
       ids: [target],
       newStatus: 'APPROVED',
       request: () => http.put(`/admin/products/${target}/approve`),
-      success: () => `Đã duyệt ${nameOf(target)}.`
+      success: () => `Đã duyệt ${label}.`
     });
   }
 
@@ -454,11 +493,12 @@ PU.modules.pending = (function () {
   }
 
   function rejectOne(id, reason) {
+    const label = nameOf(id);
     return optimistic({
       ids: [id],
       newStatus: 'REJECTED',
       request: () => http.put(`/admin/products/${id}/reject`, { reason }),
-      success: () => `Đã từ chối ${nameOf(id)} và gửi lý do cho người đăng.`
+      success: () => `Đã từ chối ${label} và gửi lý do cho người đăng.`
     });
   }
 
@@ -473,16 +513,13 @@ PU.modules.pending = (function () {
   }
 
   /* ---------------------------- CẬP NHẬT LẠC QUAN --------------------------- */
-  // Gỡ tin khỏi hàng chờ NGAY rồi mới gọi API → kiểm duyệt viên làm tiếp không phải chờ.
-  // API lỗi → trả tin về chỗ cũ và báo lỗi. Trả về true nếu thành công.
-  //   job = { ids, newStatus, request(), success(kếtQuảApi) → câu thông báo, reconcile? }
   async function optimistic(job) {
     const backup = snapshot();
     setBusy(true);
     state.selectedId = nextRemaining(job.ids);
     state.imageIndex = 0;
     takeOut(job.ids, job.newStatus);
-    render();
+    if (state.phase === 'ready') render();
 
     try {
       const result = await job.request();
@@ -493,7 +530,7 @@ PU.modules.pending = (function () {
     } catch (e) {
       setBusy(false);
       restore(backup);
-      render();
+      if (state.phase === 'ready') render();
       ui.toast(`${e.message || 'Thao tác thất bại.'} Tin đã được trả lại hàng chờ.`, 'error');
       return false;
     }
@@ -503,6 +540,8 @@ PU.modules.pending = (function () {
     return {
       queue: state.queue.slice(),
       selectedId: state.selectedId,
+      totalElements: state.totalElements,
+      totalPending: state.totalPending,
       checked: new Set(state.checked),
       skipped: new Map(state.skipped)
     };
@@ -511,25 +550,37 @@ PU.modules.pending = (function () {
   function restore(backup) {
     state.queue = backup.queue;
     state.selectedId = backup.selectedId;
+    state.totalElements = backup.totalElements;
+    state.totalPending = backup.totalPending;
     state.checked = backup.checked;
     state.skipped = backup.skipped;
     state.queue.forEach(p => { p.status = 'PENDING'; });
     state.issues.clear();
   }
 
-  // Gỡ các tin khỏi hàng chờ, ghi trạng thái mới (để thống kê người bán đúng ngay)
   function takeOut(ids, newStatus) {
-    state.queue.filter(p => ids.includes(p.id)).forEach(p => {
+    const removed = state.queue.filter(p => ids.includes(p.id));
+    removed.forEach(p => {
       p.status = newStatus;
       state.checked.delete(p.id);
       state.skipped.delete(p.id);
+      const sid = product.seller(p).id;
+      const st = sid != null ? state.sellerStats.get(Number(sid)) : null;
+      if (st) {
+        st.pending = Math.max(0, (st.pending || 0) - 1);
+        if (newStatus === 'APPROVED') st.approved = (st.approved || 0) + 1;
+        if (newStatus === 'REJECTED') st.rejected = (st.rejected || 0) + 1;
+      }
     });
+    const delta = removed.length;
+    if (delta > 0) {
+      state.totalElements = Math.max(0, state.totalElements - delta);
+      state.totalPending = Math.max(0, state.totalPending - delta);
+    }
     state.queue = state.queue.filter(p => !ids.includes(p.id));
     state.issues.clear();
   }
 
-  // Tin sẽ được xem tiếp sau khi các tin `ids` rời hàng chờ:
-  // tin kế tiếp trong danh sách, hết thì lùi về tin liền trước.
   function nextRemaining(ids) {
     if (!ids.includes(state.selectedId)) return state.selectedId;
     const items = visibleItems();
@@ -540,7 +591,6 @@ PU.modules.pending = (function () {
     return target ? target.id : null;
   }
 
-  // Khoá các nút thao tác trong lúc chờ API để tránh bấm hai lần
   function setBusy(busy) {
     state.busy = busy;
     document.querySelectorAll('#section-pending [data-action]').forEach(button => {
@@ -548,14 +598,22 @@ PU.modules.pending = (function () {
     });
   }
 
-  // Sau khi API thành công: đồng bộ mục Sản phẩm (nếu đang mở) và đối chiếu lại hàng chờ
   function afterChange(job) {
-    if (PU.router.currentSection() === 'products') PU.router.reload();
+    PU.router.invalidate('dashboard', 'products', 'pending');
+    if (PU.router.currentSection() === 'products') {
+      PU.router.reload();
+      return;
+    }
+    // Nếu vừa xử lý hết các tin trên trang hiện tại nhưng vẫn còn trang khác → tự nạp trang kế
+    if (state.phase === 'ready' && state.queue.length === 0 && state.totalElements > 0) {
+      if (state.page > 0 && state.page * state.size >= state.totalElements) state.page--;
+      load();
+      return;
+    }
     if (job.reconcile) refreshQuietly();
   }
 
   /* ------------------------- HỘP THOẠI LÝ DO TỪ CHỐI ------------------------ */
-  // Mở lại cho đúng (các) tin lần trước thì giữ chữ đã gõ, tin khác thì để trống
   function openReasonDialog(ids) {
     const input = $('rejectReason');
     if (!sameIds(ids, state.rejectIds)) input.value = '';
@@ -589,11 +647,9 @@ PU.modules.pending = (function () {
 
     ui.closeModal('rejectModal');
     const ok = ids.length > 1 ? await rejectMany(ids, reason) : await rejectOne(ids[0], reason);
-    // Thành công → lần mở sau bắt đầu với ô trống; lỗi → giữ lý do để gửi lại
     if (ok) state.rejectIds = [];
   }
 
-  // Bấm chip → thêm / bớt câu lý do đó trong ô nhập (các lý do cách nhau bằng "; ")
   function toggleReason(chip) {
     const text = chip.dataset.reason;
     const input = $('rejectReason');
@@ -610,7 +666,6 @@ PU.modules.pending = (function () {
     return text.split(';').map(s => s.trim()).filter(Boolean);
   }
 
-  // Chip nào có câu lý do đang nằm trong ô nhập thì sáng lên + đếm số ký tự
   function syncReasonForm() {
     const text = $('rejectReason').value;
     const reasons = splitReasons(text);
@@ -636,7 +691,6 @@ PU.modules.pending = (function () {
     render({ keepReview: true });
   }
 
-  // Ô "chọn tất cả": tick / bỏ tick mọi tin đang hiển thị
   function toggleAll(on) {
     visibleItems().forEach(p => (on ? state.checked.add(p.id) : state.checked.delete(p.id)));
     render({ keepReview: true });
@@ -652,7 +706,6 @@ PU.modules.pending = (function () {
     if (id !== null) toggleCheck(id, !state.checked.has(id));
   }
 
-  // Có tin được chọn, không vượt giới hạn của backend và không đang bận
   function canBulk(ids) {
     if (ids.length > BULK_LIMIT) {
       ui.toast(`Mỗi lần chỉ xử lý được tối đa ${BULK_LIMIT} tin, hãy bỏ chọn bớt.`, 'warn');
@@ -680,7 +733,6 @@ PU.modules.pending = (function () {
     if (canBulk(ids)) openReasonDialog(ids);
   }
 
-  // API hàng loạt trả { processed, skipped } (số lượng hoặc danh sách id)
   function bulkMessage(verb, result, requested) {
     const done = countOf(result && result.processed, requested);
     const skipped = countOf(result && result.skipped, 0);
@@ -697,7 +749,6 @@ PU.modules.pending = (function () {
   }
 
   /* --------------------------------- PHÍM TẮT -------------------------------- */
-  // Phím thao tác không lặp lại khi giữ phím (tránh duyệt nhầm cả loạt tin)
   const ACTION_KEYS = { a: () => approve(), r: () => openReject(), s: skip, x: toggleCurrentCheck };
   const MOVE_KEYS = { j: next, arrowdown: next, k: prev, arrowup: prev };
 
@@ -709,7 +760,6 @@ PU.modules.pending = (function () {
     action();
   }
 
-  // Chỉ bật phím tắt khi đang ở mục Duyệt bài, không gõ chữ, không mở hộp thoại
   function shortcutsEnabled(e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
     if (!isOnScreen() || ui.anyModalOpen() || PU.lightbox.isOpen()) return false;
@@ -727,7 +777,6 @@ PU.modules.pending = (function () {
   }
 
   /* ------------------------------- TỰ LÀM MỚI -------------------------------- */
-  // Bật ô "Tự làm mới" → cứ mỗi PENDING_REFRESH_MS (60 giây) tải lại hàng chờ
   function autoRefreshTick() {
     const box = $('pqAuto');
     if (box && box.checked && isOnScreen() && !document.hidden) refreshQuietly({ announce: true });
@@ -737,7 +786,6 @@ PU.modules.pending = (function () {
   function bindEvents() {
     document.addEventListener('keydown', onKeyDown);
     $('rejectReason').addEventListener('input', syncReasonForm);
-    // Ctrl + Enter (Cmd + Enter trên Mac) trong hộp thoại = bấm "Từ chối"
     $('rejectModal').addEventListener('keydown', e => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
@@ -745,13 +793,13 @@ PU.modules.pending = (function () {
       }
     });
     NARROW.addEventListener('change', closeDrawer);
-    setInterval(autoRefreshTick, PU.config.PENDING_REFRESH_MS);
+    setInterval(autoRefreshTick, cfg.PENDING_REFRESH_MS);
   }
 
   document.addEventListener('DOMContentLoaded', bindEvents);
 
   return {
-    load, applyFilters, clearFilters,
+    load, onSearch, applyFilters, clearFilters,
     select, next, prev, skip, closeDrawer,
     showImage, zoom,
     approve, openReject, confirmReject, toggleReason,

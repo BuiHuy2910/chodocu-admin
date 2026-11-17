@@ -1,6 +1,5 @@
 /* =============================================================================
-   Module: Tài chính & phí sàn — cấu hình phí, bậc phí, giao dịch gần đây
-   (Chỉ ADMIN thấy mục này; backend cũng chỉ cho ADMIN gọi các API tài chính.)
+   Module: Tài chính & phí sàn — 1 request gộp (summary + bậc phí + mô phỏng + trang GD)
    ============================================================================= */
 window.PU = window.PU || {};
 PU.modules = PU.modules || {};
@@ -11,13 +10,13 @@ PU.modules.financial = (function () {
   const esc = ui.esc;
   const $ = id => document.getElementById(id);
 
-  // Các khoá cài đặt phải là số (fee_payer là chữ: SELLER / BUYER / SPLIT)
   const NUMERIC_KEYS = ['min_platform_fee', 'max_platform_fee', 'platform_fee_rate'];
-  // Số tiền mẫu cho bảng mô phỏng phí → hậu tố id của ô hiển thị
-  const PREVIEW_SAMPLES = [[50000, '50k'], [500000, '500k'], [2000000, '2m']];
+  const PREVIEW_KEYS = ['50k', '500k', '2m'];
 
   let financial = null;
   let tiers = [];
+  let txPage = 0;
+  let txSize = 10;
 
   function setText(id, value) {
     const el = $(id);
@@ -27,15 +26,32 @@ PU.modules.financial = (function () {
   /* --------------------------------- TẢI DỮ LIỆU ------------------------------ */
   async function load() {
     try {
-      financial = await http.get('/admin/financial');
+      financial = await http.get('/admin/financial' + http.query({ page: txPage, size: txSize }));
       showSummary(financial);
       fillSettingInputs(financial);
       showFeeStatus(financial.feeEnabled !== false);
-      renderTransactions(financial.recentTransactions || []);
-      refreshPreviews();
-      loadTiers();
+      renderPreviews(financial.feePreviews || {});
+      renderTiers(financial.feeTiers || []);
+      renderTransactionsPage(financial.transactionsPage || {
+        content: financial.recentTransactions || [],
+        pageNumber: txPage,
+        pageSize: txSize,
+        totalElements: (financial.recentTransactions || []).length,
+        totalPages: 1
+      });
     } catch (e) {
       ui.toast(`Không tải được dữ liệu tài chính: ${e.message}`, 'error');
+    }
+  }
+
+  async function loadTransactionsOnly() {
+    $('transactionBody').innerHTML = ui.skeletonRows(9, 4);
+    try {
+      const pageData = await http.get('/admin/transactions' + http.query({ page: txPage, size: txSize }));
+      renderTransactionsPage(pageData);
+    } catch (e) {
+      $('transactionBody').innerHTML = ui.emptyRow(9, 'Không tải được giao dịch', e.message);
+      ui.renderPager('transactionsPager', null);
     }
   }
 
@@ -61,23 +77,26 @@ PU.modules.financial = (function () {
     badge.className = `pu-badge ${enabled ? 'pu-badge--ok' : 'pu-badge--neutral'}`;
   }
 
-  // Bảng mô phỏng: hỏi backend phí của vài số tiền mẫu
-  async function refreshPreviews() {
-    for (const [amount, key] of PREVIEW_SAMPLES) {
-      try {
-        const preview = await http.get(`/admin/fee/preview?amount=${amount}`);
-        setText(`preview${key}`, ui.fmt(preview.platformFeeAmount));
-        setText(`preview${key}Seller`, ui.fmt(preview.sellerReceiveAmount));
-      } catch (_) {
-        // Không mô phỏng được thì giữ dấu "—"
-      }
+  function renderPreviews(previews) {
+    for (const key of PREVIEW_KEYS) {
+      const item = previews[key];
+      setText(`preview${key}`, item ? ui.fmt(item.platformFeeAmount) : '—');
+      setText(`preview${key}Seller`, item ? ui.fmt(item.sellerReceiveAmount) : '—');
     }
   }
 
-  function renderTransactions(list) {
+  function renderTransactionsPage(pageData) {
+    const list = (pageData && pageData.content) || [];
     $('transactionBody').innerHTML = list.length
       ? list.map(transactionRow).join('')
       : ui.emptyRow(9, 'Chưa có giao dịch', 'Giao dịch được tạo khi một đơn chuyển sang Hoàn thành.');
+
+    ui.renderPager('transactionsPager', pageData, {
+      unit: 'giao dịch',
+      sizes: [10, 20, 50],
+      onPage: next => { txPage = next; loadTransactionsOnly(); },
+      onSize: nextSize => { txSize = nextSize; txPage = 0; loadTransactionsOnly(); }
+    });
   }
 
   function transactionRow(t) {
@@ -96,14 +115,18 @@ PU.modules.financial = (function () {
   }
 
   /* ---------------------------------- BẬC PHÍ --------------------------------- */
+  function renderTiers(list) {
+    tiers = list || [];
+    $('feeTiersBody').innerHTML = tiers.length
+      ? tiers.map(tierRow).join('')
+      : ui.emptyRow(7, 'Chưa có bậc phí', 'Hệ thống đang dùng tỷ lệ cơ bản cho mọi đơn.');
+  }
+
   async function loadTiers() {
     const body = $('feeTiersBody');
     body.innerHTML = ui.skeletonRows(7, 3);
     try {
-      tiers = (await http.get('/admin/fee-tiers')) || [];
-      body.innerHTML = tiers.length
-        ? tiers.map(tierRow).join('')
-        : ui.emptyRow(7, 'Chưa có bậc phí', 'Hệ thống đang dùng tỷ lệ cơ bản cho mọi đơn.');
+      renderTiers(await http.get('/admin/fee-tiers'));
     } catch (e) {
       body.innerHTML = ui.emptyRow(7, 'Không tải được bậc phí', e.message);
     }
@@ -138,7 +161,6 @@ PU.modules.financial = (function () {
       </tr>`;
   }
 
-  // Không truyền id → thêm bậc mới
   function openTier(id) {
     const t = id ? tiers.find(x => x.id === id) : null;
     $('tierId').value = t ? t.id : '';
@@ -174,6 +196,7 @@ PU.modules.financial = (function () {
       else await http.post('/admin/fee-tiers', tier);
       ui.closeModal('tierModal');
       ui.toast('Đã lưu bậc phí.', 'ok');
+      PU.router.invalidate('settings');
       load();
     } catch (e) {
       ui.toast(e.message, 'error');
@@ -185,7 +208,7 @@ PU.modules.financial = (function () {
       try {
         await http.del(`/admin/fee-tiers/${id}`);
         ui.toast('Đã tắt bậc phí.', 'ok');
-        loadTiers();
+        load();
       } catch (e) {
         ui.toast(e.message, 'error');
       }
@@ -200,7 +223,6 @@ PU.modules.financial = (function () {
     putSetting(key, value);
   }
 
-  // Ô nhập theo %, backend lưu dạng tỉ lệ (5% → 0.05)
   function saveRate() {
     const percent = Number($('feeRate').value);
     if (Number.isNaN(percent) || percent < 0 || percent > 30) return ui.toast('Tỷ lệ phải trong khoảng 0–30%.', 'warn');
@@ -216,6 +238,7 @@ PU.modules.financial = (function () {
     try {
       await http.put(`/admin/settings/${key}`, { value });
       ui.toast(successMessage || 'Đã cập nhật cài đặt.', 'ok');
+      PU.router.invalidate('settings');
       load();
     } catch (e) {
       ui.toast(e.message, 'error');

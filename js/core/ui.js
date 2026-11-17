@@ -1,5 +1,5 @@
 /* =============================================================================
-   UI helpers dùng chung: định dạng, badge, ảnh/avatar, toast, modal, trạng thái
+   UI helpers dùng chung: định dạng, badge, ảnh/avatar, phân trang, debounce, modal
    ============================================================================= */
 window.PU = window.PU || {};
 
@@ -39,10 +39,6 @@ PU.ui = (function () {
   const pad = n => String(n).padStart(2, '0');
   const validDate = d => (Number.isNaN(d.getTime()) ? null : d);
 
-  // Đọc ngày giờ từ backend, hỗ trợ các dạng:
-  //   "2026-11-16T14:03:15Z"     → createdAtIso (giờ UTC, trình duyệt tự đổi sang giờ máy)
-  //   "16/11/2026 21:03"         → createdAt (đã đổi sẵn sang giờ Việt Nam)
-  //   "2026-11-16T21:03:15.123"  → ISO không có múi giờ (dữ liệu cũ) = giờ máy
   function parseDate(raw) {
     if (raw === null || raw === undefined || raw === '') return null;
     if (raw instanceof Date) return validDate(raw);
@@ -63,24 +59,21 @@ PU.ui = (function () {
       return validDate(new Date(+year, month - 1, +day, +hour, +minute, +second, ms));
     }
 
-    return validDate(new Date(text)); // dạng khác, ví dụ có múi giờ "…Z" hoặc "…+07:00"
+    return validDate(new Date(text));
   }
 
-  // → "16/11/2026 21:03"
   function fmtDate(raw) {
     const d = parseDate(raw);
     if (!d) return raw ? String(raw) : '—';
     return `${fmtDay(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
-  // → "16/11/2026"
   function fmtDay(raw) {
     const d = parseDate(raw);
     if (!d) return raw ? String(raw) : '—';
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
   }
 
-  // Khoảng thời gian dễ đọc: 90 phút → "1 giờ", 50 giờ → "2 ngày"
   function duration(ms) {
     const minutes = Math.floor(Math.max(ms, 0) / 60000);
     if (minutes < 1) return 'dưới 1 phút';
@@ -93,27 +86,33 @@ PU.ui = (function () {
   }
 
   /* --------------------------------- CHUỖI ---------------------------------- */
-  // Luôn bọc dữ liệu từ người dùng bằng esc() trước khi gán vào innerHTML
   function esc(value) {
     return String(value === null || value === undefined ? '' : value)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  // Bỏ dấu + chữ thường để tìm kiếm: "Điện Thoại" → "dien thoai"
   function normalize(value) {
     return String(value || '')
-      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/đ/g, 'd').replace(/Đ/g, 'D')
       .toLowerCase().replace(/\s+/g, ' ').trim();
   }
 
-  // "Nguyễn Văn An" → "NA" (đã escape, dùng cho avatar chữ cái)
   function initials(name) {
     const words = String(name || '').trim().split(/\s+/).filter(Boolean);
     if (!words.length) return '?';
     const letters = words.length > 1 ? words[0][0] + words[words.length - 1][0] : words[0].slice(0, 2);
     return esc(letters.toUpperCase());
+  }
+
+  // Trì hoãn gọi hàm khi gõ phím liên tục để không bắn nhiều request xuống server
+  function debounce(fn, wait) {
+    let timer = null;
+    return function (...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), wait || 300);
+    };
   }
 
   /* --------------------------------- BADGE ---------------------------------- */
@@ -138,7 +137,6 @@ PU.ui = (function () {
     STUDENT:   ['Sinh viên', 'ok']
   };
 
-  // Hành động trong nhật ký kiểm duyệt
   const ACTION_MAP = {
     APPROVE: ['Duyệt', 'ok'],
     REJECT:  ['Từ chối', 'danger'],
@@ -158,11 +156,9 @@ PU.ui = (function () {
   function statusLabel(status) { return (STATUS_MAP[status] || [status || '—'])[0]; }
 
   /* ------------------------------ ẢNH & AVATAR ------------------------------ */
-  // Không dùng ảnh mẫu/ảnh stock. Cách làm: lớp dự phòng (biểu tượng hoặc chữ cái)
-  // nằm dưới, <img> phủ lên trên; nếu ảnh lỗi thì gỡ <img> → lộ lớp dự phòng.
   function imgTag(url, alt) {
     if (!url) return '';
-    return `<img src="${esc(url)}" alt="${esc(alt || '')}" loading="lazy" onerror="PU.ui.imgFail(this)" />`;
+    return `<img src="${esc(url)}" alt="${esc(alt || '')}" loading="lazy" decoding="async" onerror="PU.ui.imgFail(this)" />`;
   }
 
   function imgFail(img) {
@@ -170,18 +166,14 @@ PU.ui = (function () {
     img.remove();
   }
 
-  // Ruột của ô ảnh (dùng trực tiếp khi ô ảnh là một <button>)
   function thumbInner(url, alt) {
     return `<span class="material-symbols-outlined">image_not_supported</span>${imgTag(url, alt)}`;
   }
 
-  // Ô ảnh sản phẩm: không có ảnh / ảnh lỗi → biểu tượng trung tính
   function thumb(url, className) {
     return `<span class="pu-thumb ${className || ''}">${thumbInner(url)}</span>`;
   }
 
-  // Avatar tròn: chữ cái viết tắt, phủ ảnh thật nếu người dùng đã tải lên.
-  // size: 'sm' | 'md' | 'lg'. Màu nền chọn theo tên để mỗi người một màu cố định.
   function avatar(name, url, size) {
     const tone = hashText(name) % 4;
     return `<span class="pu-avatar pu-avatar--${size || 'sm'} pu-avatar--tone${tone}" aria-hidden="true">${initials(name)}${imgTag(url)}</span>`;
@@ -193,9 +185,93 @@ PU.ui = (function () {
     return hash;
   }
 
+  /* ------------------------------- PHÂN TRANG ------------------------------- */
+  // Vẽ thanh phân trang vào containerId.
+  // pageData: { pageNumber, pageSize, totalElements, totalPages }
+  // opts: { onPage(p), onSize?(s), sizes?: [10,15,25,50], unit?: 'mục', compact?: false }
+  function renderPager(containerId, pageData, opts) {
+    const box = $(containerId);
+    if (!box) return;
+
+    const total = Number(pageData && pageData.totalElements) || 0;
+    const totalPages = Math.max(Number(pageData && pageData.totalPages) || 0, 1);
+    const page = Math.min(Math.max(Number(pageData && pageData.pageNumber) || 0, 0), totalPages - 1);
+    const size = Number(pageData && pageData.pageSize) || 15;
+    const options = opts || {};
+
+    if (total <= 0) {
+      box.innerHTML = '';
+      box.classList.add('hidden');
+      return;
+    }
+
+    const from = page * size + 1;
+    const to = Math.min(total, (page + 1) * size);
+    const unit = options.unit || 'mục';
+    const compact = !!options.compact;
+    const sizes = options.sizes || [10, 15, 25, 50];
+
+    const infoHtml = compact
+      ? `<span class="pu-pager__info">Trang <b>${page + 1}</b>/${totalPages} · ${fmtNum(total)} ${esc(unit)}</span>`
+      : `<span class="pu-pager__info">Hiển thị <b>${fmtNum(from)}–${fmtNum(to)}</b> trong <b>${fmtNum(total)}</b> ${esc(unit)}</span>`;
+
+    const sizeHtml = typeof options.onSize === 'function'
+      ? `<select class="pu-select pu-input--sm pu-pager__size" aria-label="Số dòng mỗi trang">
+           ${sizes.map(s => `<option value="${s}" ${s === size ? 'selected' : ''}>${s} / trang</option>`).join('')}
+         </select>`
+      : '';
+
+    const pages = pageWindow(page, totalPages, compact ? 1 : 2);
+    const pageBtns = pages.map(item => item === '...'
+      ? '<span class="pu-pager__dots">…</span>'
+      : `<button type="button" class="pu-btn pu-btn--sm pu-pager__btn${item === page ? ' is-active' : ''}" data-page="${item}" ${item === page ? 'aria-current="page"' : ''}>${item + 1}</button>`
+    ).join('');
+
+    const navHtml = totalPages > 1 ? `
+      <div class="pu-pager__pages">
+        <button type="button" class="pu-btn pu-btn--ghost pu-btn--sm pu-pager__btn" data-page="${page - 1}" ${page <= 0 ? 'disabled' : ''} title="Trang trước" aria-label="Trang trước">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        ${pageBtns}
+        <button type="button" class="pu-btn pu-btn--ghost pu-btn--sm pu-pager__btn" data-page="${page + 1}" ${page >= totalPages - 1 ? 'disabled' : ''} title="Trang sau" aria-label="Trang sau">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>` : '';
+
+    box.className = `pu-pager${compact ? ' pu-pager--compact' : ''}`;
+    box.innerHTML = `${infoHtml}<div class="pu-pager__controls">${sizeHtml}${navHtml}</div>`;
+
+    box.querySelectorAll('button[data-page]').forEach(btn => {
+      btn.onclick = () => {
+        const next = Number(btn.getAttribute('data-page'));
+        if (!Number.isNaN(next) && next !== page && next >= 0 && next < totalPages && typeof options.onPage === 'function') {
+          options.onPage(next);
+        }
+      };
+    });
+
+    const select = box.querySelector('.pu-pager__size');
+    if (select && typeof options.onSize === 'function') {
+      select.onchange = () => options.onSize(Number(select.value) || size);
+    }
+  }
+
+  function pageWindow(current, total, radius) {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i);
+    const set = new Set([0, total - 1]);
+    for (let i = current - radius; i <= current + radius; i++) {
+      if (i >= 0 && i < total) set.add(i);
+    }
+    const sorted = Array.from(set).sort((a, b) => a - b);
+    const out = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i] - sorted[i - 1] > 1) out.push('...');
+      out.push(sorted[i]);
+    }
+    return out;
+  }
+
   /* -------------------------- LỊCH SỬ KIỂM DUYỆT ---------------------------- */
-  // Dòng thời gian, mới nhất ở trên. API /admin/products/{id}/logs trả moderatorName,
-  // API /admin/moderation-logs trả adminName → chấp nhận cả hai.
   function historyList(logs) {
     if (!logs || !logs.length) return '<div class="pu-history__empty">Chưa có lịch sử kiểm duyệt.</div>';
     const newestFirst = logs.slice().sort((a, b) =>
@@ -224,7 +300,6 @@ PU.ui = (function () {
   /* --------------------------------- TOAST ---------------------------------- */
   const TOAST_ICONS = { ok: 'check_circle', err: 'error', warn: 'warning', info: 'info' };
 
-  // type: 'ok' | 'error' | 'warn' | 'info'
   function toast(message, type) {
     const box = $('toasts');
     if (!box) return;
@@ -249,7 +324,6 @@ PU.ui = (function () {
     document.querySelectorAll('.pu-modal.is-open').forEach(m => m.classList.remove('is-open'));
   }
 
-  // Hộp thoại xác nhận. options: { okLabel: 'Đồng ý', tone: 'danger' | 'primary' | 'warn' }
   function confirmDialog(title, desc, onOk, options) {
     const opts = Object.assign({ okLabel: 'Đồng ý', tone: 'danger' }, options);
     $('confirmTitle').textContent = title;
@@ -257,14 +331,13 @@ PU.ui = (function () {
     const button = $('confirmOk');
     button.className = `pu-btn pu-btn--${opts.tone}`;
     button.textContent = opts.okLabel;
-    button.onclick = () => {          // gán onclick → luôn chỉ có MỘT handler
+    button.onclick = () => {
       closeModal('confirmModal');
       if (typeof onOk === 'function') onOk();
     };
     openModal('confirmModal');
   }
 
-  // Hỏi một ghi chú ngắn (không bắt buộc) rồi gọi onOk(ghiChu)
   function askNote(title, onOk) {
     $('noteTitle').textContent = title || 'Ghi chú';
     const input = $('noteInput');
@@ -291,7 +364,6 @@ PU.ui = (function () {
     return `<tr><td colspan="${cols}">${emptyState(title, desc)}</td></tr>`;
   }
 
-  // actionHtml (tuỳ chọn): ví dụ nút "Thử lại"
   function emptyState(title, desc, icon, actionHtml) {
     return `
       <div class="pu-state">
@@ -306,7 +378,6 @@ PU.ui = (function () {
   function toggleSidebar() { const sb = $('sidebar'); if (sb) sb.classList.toggle('is-open'); }
   function closeSidebar() { const sb = $('sidebar'); if (sb) sb.classList.remove('is-open'); }
 
-  // Số đếm cạnh mục menu (ẩn khi bằng 0)
   function setBadge(id, count) {
     const el = $(id);
     if (!el) return;
@@ -317,9 +388,9 @@ PU.ui = (function () {
 
   return {
     fmt, fmtNum, fmtPct, parseDate, fmtDate, fmtDay, duration,
-    esc, normalize, initials,
+    esc, normalize, initials, debounce,
     statusBadge, statusLabel, roleBadge, actionBadge,
-    thumb, thumbInner, avatar, imgFail, historyList,
+    thumb, thumbInner, avatar, imgFail, historyList, renderPager,
     toast, openModal, closeModal, closeAllModals, isModalOpen, anyModalOpen,
     confirmDialog, askNote,
     skeleton, skeletonRows, emptyRow, emptyState,

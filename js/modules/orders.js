@@ -1,5 +1,5 @@
 /* =============================================================================
-   Module: Đơn hàng — theo dõi và can thiệp trạng thái đơn (chỉ ADMIN thấy mục này)
+   Module: Đơn hàng — phân trang server-side + tìm kiếm debounce + huỷ request cũ
    ============================================================================= */
 window.PU = window.PU || {};
 PU.modules = PU.modules || {};
@@ -7,17 +7,15 @@ PU.modules = PU.modules || {};
 PU.modules.orders = (function () {
   const http = PU.http;
   const ui = PU.ui;
+  const cfg = PU.config;
   const esc = ui.esc;
   const $ = id => document.getElementById(id);
 
   const COLUMNS = 9;
-
-  // Trạng thái nào thì được chuyển sang trạng thái nào
   const CAN_ACCEPT = ['PENDING', 'DISPUTED'];
   const CAN_COMPLETE = ['PENDING', 'ACCEPTED', 'DISPUTED'];
   const FINISHED = ['COMPLETED', 'CANCELLED', 'REJECTED'];
 
-  // Dùng để ghép câu "Ghi chú khi …"
   const ACTION_LABEL = {
     ACCEPTED: 'duyệt đơn',
     COMPLETED: 'hoàn tất đơn',
@@ -26,17 +24,51 @@ PU.modules.orders = (function () {
     REJECTED: 'từ chối đơn'
   };
 
+  let page = 0;
+  let size = cfg.DEFAULT_PAGE_SIZE || 15;
+  let aborter = null;
+
+  const debouncedSearch = ui.debounce(() => {
+    page = 0;
+    load();
+  }, 300);
+
+  function onSearch() {
+    debouncedSearch();
+  }
+
+  function onFilterChange() {
+    page = 0;
+    load();
+  }
+
   async function load() {
+    if (aborter) aborter.abort();
+    aborter = new AbortController();
+
     const body = $('ordersBody');
     body.innerHTML = ui.skeletonRows(COLUMNS, 5);
     const status = $('orderStatusFilter').value;
+    const keyword = ($('orderSearch') && $('orderSearch').value.trim()) || '';
+
     try {
-      const orders = (await http.get('/admin/orders' + (status ? `?status=${encodeURIComponent(status)}` : ''))) || [];
+      const data = await http.get('/admin/orders' + http.query({ status, keyword, page, size }), {
+        signal: aborter.signal
+      });
+      const orders = (data && data.content) || [];
       body.innerHTML = orders.length
         ? orders.map(row).join('')
         : ui.emptyRow(COLUMNS, 'Không có đơn hàng', 'Chưa có đơn nào khớp bộ lọc hiện tại.');
+
+      ui.renderPager('ordersPager', data, {
+        unit: 'đơn hàng',
+        onPage: next => { page = next; load(); },
+        onSize: nextSize => { size = nextSize; page = 0; load(); }
+      });
     } catch (e) {
+      if (e && e.aborted) return;
       body.innerHTML = ui.emptyRow(COLUMNS, 'Không tải được đơn hàng', e.message);
+      ui.renderPager('ordersPager', null);
     }
   }
 
@@ -70,12 +102,12 @@ PU.modules.orders = (function () {
     return `<div class="pu-row-actions">${buttons.join('')}</div>`;
   }
 
-  // Hỏi ghi chú (không bắt buộc) rồi đổi trạng thái đơn
   function update(id, status) {
     ui.askNote(`Ghi chú khi ${ACTION_LABEL[status] || 'cập nhật đơn'}`, async note => {
       try {
         await http.put(`/admin/orders/${id}/status`, { status, note: note || null });
         ui.toast('Đã cập nhật trạng thái đơn hàng.', 'ok');
+        PU.router.invalidate('dashboard', 'products', 'financial');
         load();
       } catch (e) {
         ui.toast(e.message, 'error');
@@ -83,7 +115,7 @@ PU.modules.orders = (function () {
     });
   }
 
-  return { load, update };
+  return { load, onSearch, onFilterChange, update };
 })();
 
 PU.orders = PU.modules.orders;

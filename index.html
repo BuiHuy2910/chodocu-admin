@@ -15,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet" />
 
   <link rel="stylesheet" href="css/admin.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script id="chartScript" defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -67,17 +67,6 @@
       <button id="loginBtn" type="submit" class="pu-btn pu-btn--primary pu-btn--block pu-btn--lg pu-login__submit">
         <span class="material-symbols-outlined">login</span> Đăng nhập
       </button>
-
-      <div class="pu-demo-box">
-        <div class="pu-demo-box__title">Tài khoản mẫu (bấm để điền sẵn)</div>
-        <button type="button" class="pu-demo-row" data-email="admin@chodocu.edu.vn" data-password="admin123" onclick="PU.auth.fillDemo(this)">
-          <span>Admin</span><code>admin@chodocu.edu.vn / admin123</code>
-        </button>
-        <button type="button" class="pu-demo-row" data-email="mod@passuni.vn" data-password="password123" onclick="PU.auth.fillDemo(this)">
-          <span>Moderator</span><code>mod@passuni.vn / password123</code>
-        </button>
-        <p class="pu-demo-box__note">Có sẵn sau khi chạy <code>seed_data.sql</code>. Admin có thể cấp quyền Moderator cho tài khoản khác ở mục Người dùng.</p>
-      </div>
     </form>
   </div>
 </div>
@@ -257,7 +246,7 @@
           <div class="pu-mod__toolbar">
             <div class="pu-search">
               <span class="material-symbols-outlined">search</span>
-              <input id="pqSearch" class="pu-input" placeholder="Tiêu đề, mô tả, người bán, #id…" aria-label="Tìm trong hàng chờ" oninput="PU.pending.applyFilters()" />
+              <input id="pqSearch" class="pu-input" placeholder="Tiêu đề, mô tả, người bán, #id…" aria-label="Tìm trong hàng chờ" oninput="PU.pending.onSearch()" />
             </div>
             <select id="pqCategory" class="pu-select" aria-label="Lọc theo danh mục" onchange="PU.pending.applyFilters()">
               <option value="">Tất cả danh mục</option>
@@ -292,6 +281,7 @@
               </div>
               <div id="pqBulkBar" class="pu-bulkbar hidden"></div>
               <div id="pqList" class="pu-queue" role="listbox" aria-label="Hàng chờ duyệt"></div>
+              <div id="pqPager" class="pu-pager pu-pager--compact hidden"></div>
             </div>
             <div id="pqBackdrop" class="pu-mod__backdrop" onclick="PU.pending.closeDrawer()"></div>
             <div id="pqReview" class="pu-mod__review" aria-label="Chi tiết tin đăng"></div>
@@ -321,9 +311,9 @@
             <div class="pu-toolbar">
               <div class="pu-search">
                 <span class="material-symbols-outlined">search</span>
-                <input id="productSearch" class="pu-input" placeholder="Tên, người bán, danh mục…" aria-label="Tìm sản phẩm" oninput="PU.products.filter()" />
+                <input id="productSearch" class="pu-input" placeholder="Tên, người bán, danh mục, #id…" aria-label="Tìm sản phẩm" oninput="PU.products.onSearch()" />
               </div>
-              <select id="productStatusFilter" class="pu-select pu-select--auto" aria-label="Lọc theo trạng thái" onchange="PU.products.load()">
+              <select id="productStatusFilter" class="pu-select pu-select--auto" aria-label="Lọc theo trạng thái" onchange="PU.products.onFilterChange()">
                 <option value="">Tất cả trạng thái</option>
                 <option value="PENDING">Chờ duyệt</option>
                 <option value="APPROVED">Đã duyệt</option>
@@ -353,6 +343,7 @@
               <tbody id="productsBody"></tbody>
             </table>
           </div>
+          <div id="productsPager" class="pu-pager hidden"></div>
         </div>
       </section>
 
@@ -362,7 +353,11 @@
           <div class="pu-card__head">
             <div><div class="pu-card__title">Báo cáo vi phạm</div><div class="pu-card__sub">Xem xét và xử lý báo cáo từ sinh viên</div></div>
             <div class="pu-toolbar">
-              <select id="reportStatusFilter" class="pu-select pu-select--auto" aria-label="Lọc theo trạng thái" onchange="PU.reports.load()">
+              <div class="pu-search">
+                <span class="material-symbols-outlined">search</span>
+                <input id="reportSearch" class="pu-input" placeholder="Người báo cáo, sản phẩm, lý do…" aria-label="Tìm báo cáo" oninput="PU.reports.onSearch()" />
+              </div>
+              <select id="reportStatusFilter" class="pu-select pu-select--auto" aria-label="Lọc theo trạng thái" onchange="PU.reports.onFilterChange()">
                 <option value="ALL">Tất cả</option>
                 <option value="PENDING">Chờ xử lý</option>
                 <option value="RESOLVED">Đã xử lý</option>
@@ -390,6 +385,7 @@
               <tbody id="reportsBody"></tbody>
             </table>
           </div>
+          <div id="reportsPager" class="pu-pager hidden"></div>
         </div>
       </section>
 
@@ -402,7 +398,11 @@
               <div class="pu-card__sub">Phí sàn được chốt tại thời điểm tạo đơn</div>
             </div>
             <div class="pu-toolbar">
-              <select id="orderStatusFilter" class="pu-select pu-select--auto" aria-label="Lọc theo trạng thái" onchange="PU.orders.load()">
+              <div class="pu-search">
+                <span class="material-symbols-outlined">search</span>
+                <input id="orderSearch" class="pu-input" placeholder="Mã đơn, sản phẩm, người mua/bán…" aria-label="Tìm đơn hàng" oninput="PU.orders.onSearch()" />
+              </div>
+              <select id="orderStatusFilter" class="pu-select pu-select--auto" aria-label="Lọc theo trạng thái" onchange="PU.orders.onFilterChange()">
                 <option value="">Tất cả trạng thái</option>
                 <option value="PENDING">Chờ người bán duyệt</option>
                 <option value="ACCEPTED">Đang giao dịch</option>
@@ -434,6 +434,7 @@
               <tbody id="ordersBody"></tbody>
             </table>
           </div>
+          <div id="ordersPager" class="pu-pager hidden"></div>
         </div>
       </section>
 
@@ -577,6 +578,7 @@
               <tbody id="transactionBody"></tbody>
             </table>
           </div>
+          <div id="transactionsPager" class="pu-pager hidden"></div>
         </div>
       </section>
 
@@ -588,9 +590,9 @@
             <div class="pu-toolbar">
               <div class="pu-search">
                 <span class="material-symbols-outlined">search</span>
-                <input id="userSearch" class="pu-input" placeholder="Tên, email, mã SV…" aria-label="Tìm người dùng" oninput="PU.users.filter()" />
+                <input id="userSearch" class="pu-input" placeholder="Tên, email, mã SV, SĐT…" aria-label="Tìm người dùng" oninput="PU.users.onSearch()" />
               </div>
-              <select id="userRoleFilter" class="pu-select pu-select--auto" aria-label="Lọc theo vai trò" onchange="PU.users.filter()">
+              <select id="userRoleFilter" class="pu-select pu-select--auto" aria-label="Lọc theo vai trò" onchange="PU.users.onFilterChange()">
                 <option value="">Tất cả vai trò</option>
                 <option value="STUDENT">Sinh viên</option>
                 <option value="MODERATOR">Moderator</option>
@@ -616,6 +618,7 @@
               <tbody id="usersBody"></tbody>
             </table>
           </div>
+          <div id="usersPager" class="pu-pager hidden"></div>
         </div>
       </section>
 
@@ -786,7 +789,10 @@
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
-    <div class="pu-modal__body pu-modal__body--flush"><div id="logsContent"></div></div>
+    <div class="pu-modal__body pu-modal__body--flush">
+      <div id="logsContent"></div>
+      <div id="logsPager" class="pu-pager hidden"></div>
+    </div>
   </div>
 </div>
 

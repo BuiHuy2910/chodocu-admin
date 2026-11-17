@@ -94,14 +94,6 @@ PU.auth = (function () {
     }
   }
 
-  // Bấm dòng "Tài khoản mẫu" → điền sẵn email + mật khẩu
-  function fillDemo(button) {
-    $('loginEmail').value = button.dataset.email;
-    $('loginPassword').value = button.dataset.password;
-    setError('');
-    $('loginBtn').focus();
-  }
-
   // Nút con mắt: hiện / ẩn mật khẩu đang gõ
   function togglePassword(forceHide) {
     const input = $('loginPassword');
@@ -118,6 +110,7 @@ PU.auth = (function () {
     http.setToken('');
     http.setRole('');
     currentUser = null;
+    if (PU.router && PU.router.invalidate) PU.router.invalidate();
     applyRoleVisibility('');
     $('loginPassword').value = '';   // không để lại mật khẩu trên màn hình đăng nhập
     togglePassword(true);
@@ -144,7 +137,6 @@ PU.auth = (function () {
     login,
     logout,
     restore,
-    fillDemo,
     togglePassword,
     getUser: () => currentUser,
     getRole: () => http.getRole(),

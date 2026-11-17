@@ -1,5 +1,5 @@
 /* =============================================================================
-   Module: Cài đặt hệ thống + thông tin kết nối (chỉ ADMIN thấy mục này)
+   Module: Cài đặt hệ thống + thông tin kết nối (1 request duy nhất tới /admin/settings)
    ============================================================================= */
 window.PU = window.PU || {};
 PU.modules = PU.modules || {};
@@ -14,29 +14,37 @@ PU.modules.settings = (function () {
   const inputIdOf = key => `setting-${key}`;
 
   async function load() {
-    showConnection();
+    $('connApi').textContent = cfg.API_BASE;
+    $('connSupabase').textContent = cfg.SUPABASE_URL;
+    setConnectionStatus('pending');
+
     const box = $('settingsList');
     box.innerHTML = ui.skeleton(3);
     try {
       const settings = (await http.get('/admin/settings')) || [];
+      setConnectionStatus('ok');
       box.innerHTML = settings.length
         ? settings.map(settingRow).join('')
         : ui.emptyState('Chưa có cấu hình', '', 'tune');
     } catch (e) {
+      setConnectionStatus('err');
       box.innerHTML = ui.emptyState('Không tải được cài đặt', e.message, 'error');
     }
   }
 
-  // Địa chỉ backend đang dùng + thử gọi một API công khai để biết có kết nối được không
-  async function showConnection() {
-    $('connApi').textContent = cfg.API_BASE;
-    $('connSupabase').textContent = cfg.SUPABASE_URL;
+  function setConnectionStatus(mode) {
     const status = $('connStatus');
-    status.textContent = 'Đang kiểm tra…';
-    status.className = 't-body';
-    const ok = await fetch(`${cfg.API_BASE}/categories`).then(r => r.ok).catch(() => false);
-    status.textContent = ok ? 'Kết nối OK' : 'Không kết nối được';
-    status.className = `t-body strong ${ok ? 'text-ok' : 'text-danger'}`;
+    if (!status) return;
+    if (mode === 'pending') {
+      status.textContent = 'Đang kiểm tra…';
+      status.className = 't-body';
+    } else if (mode === 'ok') {
+      status.textContent = 'Kết nối OK';
+      status.className = 't-body strong text-ok';
+    } else {
+      status.textContent = 'Không kết nối được';
+      status.className = 't-body strong text-danger';
+    }
   }
 
   function settingRow(s) {
@@ -60,6 +68,7 @@ PU.modules.settings = (function () {
     try {
       await http.put(`/admin/settings/${encodeURIComponent(key)}`, { value });
       ui.toast(`Đã lưu cấu hình "${key}".`, 'ok');
+      PU.router.invalidate('financial');
       load();
     } catch (e) {
       ui.toast(e.message, 'error');

@@ -1,7 +1,5 @@
 /* =============================================================================
-   Module: Sản phẩm — bảng toàn bộ tin, cửa sổ chi tiết, ẩn / hiện / xoá tin
-   và nhật ký kiểm duyệt toàn sàn.
-   Duyệt / từ chối dùng chung logic với mục Duyệt bài (PU.pending).
+   Module: Sản phẩm — phân trang server-side, tìm kiếm debounce, nhật ký phân trang
    ============================================================================= */
 window.PU = window.PU || {};
 PU.modules = PU.modules || {};
@@ -9,41 +7,72 @@ PU.modules = PU.modules || {};
 PU.modules.products = (function () {
   const http = PU.http;
   const ui = PU.ui;
+  const cfg = PU.config;
   const product = PU.product;
   const esc = ui.esc;
   const $ = id => document.getElementById(id);
 
   const COLUMNS = 7;
 
-  let all = [];          // các tin của bảng (theo bộ lọc trạng thái)
-  let detail = null;     // tin đang mở trong cửa sổ chi tiết
-  let detailTicket = 0;  // mở chi tiết liên tiếp → chỉ hiện kết quả của lần mở cuối
+  let items = [];
+  let page = 0;
+  let size = cfg.DEFAULT_PAGE_SIZE || 15;
+  let aborter = null;
+
+  let detail = null;
+  let detailTicket = 0;
+
+  let logPage = 0;
+  let logSize = 20;
+
+  const debouncedSearch = ui.debounce(() => {
+    page = 0;
+    load();
+  }, 300);
+
+  function onSearch() {
+    debouncedSearch();
+  }
+
+  function onFilterChange() {
+    page = 0;
+    load();
+  }
+
+  function findItem(id) {
+    if (detail && detail.id === id) return detail;
+    return items.find(p => p.id === id) || null;
+  }
 
   /* ---------------------------------- BẢNG ---------------------------------- */
   async function load() {
+    if (aborter) aborter.abort();
+    aborter = new AbortController();
+
     const body = $('productsBody');
     body.innerHTML = ui.skeletonRows(COLUMNS, 5);
     const status = $('productStatusFilter').value;
+    const keyword = $('productSearch').value.trim();
+
     try {
-      all = (await http.get('/admin/products' + (status ? `?status=${encodeURIComponent(status)}` : ''))) || [];
-      filter();
+      const data = await http.get('/admin/products' + http.query({ status, keyword, page, size }), {
+        signal: aborter.signal
+      });
+      items = (data && data.content) || [];
+      body.innerHTML = items.length
+        ? items.map(row).join('')
+        : ui.emptyRow(COLUMNS, 'Không có sản phẩm', 'Thử đổi bộ lọc trạng thái hoặc từ khoá tìm kiếm.');
+
+      ui.renderPager('productsPager', data, {
+        unit: 'sản phẩm',
+        onPage: next => { page = next; load(); },
+        onSize: nextSize => { size = nextSize; page = 0; load(); }
+      });
     } catch (e) {
+      if (e && e.aborted) return;
       body.innerHTML = ui.emptyRow(COLUMNS, 'Không tải được danh sách sản phẩm', e.message);
+      ui.renderPager('productsPager', null);
     }
-  }
-
-  // Tìm không phân biệt dấu: gõ "dien thoai" vẫn ra "Điện thoại"
-  function filter() {
-    const query = ui.normalize($('productSearch').value);
-    const list = query ? all.filter(p => ui.normalize(searchText(p)).includes(query)) : all;
-    $('productsBody').innerHTML = list.length
-      ? list.map(row).join('')
-      : ui.emptyRow(COLUMNS, 'Không có sản phẩm', 'Thử đổi bộ lọc trạng thái hoặc từ khoá tìm kiếm.');
-  }
-
-  function searchText(p) {
-    const seller = product.seller(p);
-    return `#${p.id} ${p.title} ${seller.fullName || ''} ${seller.email || ''} ${product.category(p)}`;
   }
 
   function row(p) {
@@ -63,7 +92,6 @@ PU.modules.products = (function () {
       </tr>`;
   }
 
-  // Ảnh + tiêu đề + nhãn phụ. Tin bị từ chối hiện luôn lý do, khỏi phải mở chi tiết.
   function titleCell(p) {
     const tags = [p.isFree && 'Miễn phí', p.isUrgent && 'Tin gấp', product.school(p)].filter(Boolean).join(' · ');
     const reason = p.status === 'REJECTED' && p.rejectReason
@@ -80,7 +108,6 @@ PU.modules.products = (function () {
       </div>`;
   }
 
-  // Nút thao tác trên từng dòng, tuỳ trạng thái tin
   function rowActions(p) {
     const id = Number(p.id);
     const buttons = [iconButton('visibility', 'Xem chi tiết', `PU.products.view(${id})`)];
@@ -90,7 +117,6 @@ PU.modules.products = (function () {
     }
     if (p.status === 'APPROVED') buttons.push(iconButton('visibility_off', 'Ẩn tin', `PU.products.setHidden(${id}, true)`));
     if (p.status === 'HIDDEN') buttons.push(iconButton('restore', 'Hiện lại', `PU.products.setHidden(${id}, false)`));
-    // Xoá vĩnh viễn chỉ dành cho ADMIN (backend cũng chặn kiểm duyệt viên)
     if (PU.auth.isAdmin()) {
       buttons.push(iconButton('delete', 'Xoá', `PU.products.remove(${id})`, 'pu-btn--ghost pu-btn--danger-text'));
     }
@@ -105,8 +131,6 @@ PU.modules.products = (function () {
   }
 
   /* ------------------------------ ĐỔI TRẠNG THÁI ----------------------------- */
-  // Duyệt / từ chối: đóng cửa sổ chi tiết rồi chuyển cho mục Duyệt bài xử lý
-  // (sau khi xong, PU.pending tự tải lại bảng này nếu đang mở)
   function approve(id) {
     ui.closeModal('productModal');
     PU.pending.approve(id);
@@ -117,7 +141,6 @@ PU.modules.products = (function () {
     PU.pending.openReject(id);
   }
 
-  // Ẩn: tin biến khỏi sàn nhưng không bị xoá, có thể hiện lại bất cứ lúc nào
   function setHidden(id, hidden) {
     if (!hidden) return sendHidden(id, false);
     ui.confirmDialog('Ẩn tin đăng?', 'Tin sẽ không hiển thị trên sàn cho tới khi được hiện lại.',
@@ -128,6 +151,7 @@ PU.modules.products = (function () {
     try {
       await http.put(`/admin/products/${id}/hide?hidden=${hidden}`);
       ui.toast(hidden ? 'Đã ẩn tin đăng.' : 'Đã hiện lại tin đăng.', 'ok');
+      PU.router.invalidate('dashboard');
       afterChange(id);
     } catch (e) {
       ui.toast(e.message, 'error');
@@ -140,6 +164,7 @@ PU.modules.products = (function () {
         await http.del(`/admin/products/${id}`);
         ui.toast('Đã xoá sản phẩm.', 'ok');
         if (detail && detail.id === id) ui.closeModal('productModal');
+        PU.router.invalidate('dashboard', 'pending');
         load();
       } catch (e) {
         ui.toast(e.message, 'error');
@@ -147,7 +172,6 @@ PU.modules.products = (function () {
     }, { okLabel: 'Xoá vĩnh viễn' });
   }
 
-  // Tải lại bảng; nếu cửa sổ chi tiết của tin này đang mở thì cập nhật luôn
   function afterChange(id) {
     load();
     if (detail && detail.id === id && ui.isModalOpen('productModal')) view(id);
@@ -162,7 +186,7 @@ PU.modules.products = (function () {
     try {
       const [p, logs] = await Promise.all([
         http.get(`/admin/products/${id}`),
-        http.get(`/admin/products/${id}/logs`).catch(() => null)   // lỗi lịch sử không chặn cả cửa sổ
+        http.get(`/admin/products/${id}/logs`).catch(() => null)
       ]);
       if (ticket !== detailTicket) return;
       detail = p;
@@ -196,7 +220,6 @@ PU.modules.products = (function () {
       </div>`;
   }
 
-  // Bấm vào ảnh để xem cỡ lớn
   function galleryHtml(p) {
     const urls = product.images(p);
     if (!urls.length) {
@@ -264,17 +287,28 @@ PU.modules.products = (function () {
   }
 
   /* ----------------------- NHẬT KÝ KIỂM DUYỆT TOÀN SÀN ----------------------- */
-  async function openLogs() {
+  async function openLogs(resetPage) {
+    if (resetPage !== false) logPage = 0;
     const box = $('logsContent');
     box.innerHTML = ui.skeleton(3);
+    ui.renderPager('logsPager', null);
     ui.openModal('logsModal');
     try {
-      const logs = (await http.get('/admin/moderation-logs')) || [];
+      const data = await http.get('/admin/moderation-logs' + http.query({ page: logPage, size: logSize }));
+      const logs = (data && data.content) || [];
       box.innerHTML = logs.length
         ? logsTable(logs)
         : ui.emptyState('Chưa có nhật ký', 'Chưa có hành động kiểm duyệt nào được ghi lại.', 'history');
+
+      ui.renderPager('logsPager', data, {
+        unit: 'bản ghi',
+        sizes: [10, 20, 50],
+        onPage: next => { logPage = next; openLogs(false); },
+        onSize: nextSize => { logSize = nextSize; logPage = 0; openLogs(false); }
+      });
     } catch (e) {
       box.innerHTML = ui.emptyState('Không tải được nhật ký', e.message, 'error');
+      ui.renderPager('logsPager', null);
     }
   }
 
@@ -302,7 +336,7 @@ PU.modules.products = (function () {
       </tr>`;
   }
 
-  return { load, filter, view, openImage, approve, reject, setHidden, remove, openLogs };
+  return { load, onSearch, onFilterChange, findItem, view, openImage, approve, reject, setHidden, remove, openLogs };
 })();
 
 PU.products = PU.modules.products;
