@@ -4,9 +4,8 @@
 window.PU = window.PU || {};
 
 PU.config = {
-  // Địa chỉ backend. Chạy backend trên máy khác trong LAN thì đổi thành
-  // ví dụ 'http://192.168.1.10:8080/api'
-  API_BASE: 'http://localhost:8080/api',
+  // Địa chỉ backend (qua Cloudflare + Caddy trên server)
+  API_BASE: 'https://chodocu.vigogroup.vn/api',
 
   SUPABASE_URL: 'https://ovxnlepmewindufcgxln.supabase.co',
 
