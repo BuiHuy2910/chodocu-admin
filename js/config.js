@@ -4,8 +4,8 @@
 window.PU = window.PU || {};
 
 PU.config = {
-  // Địa chỉ backend (qua Cloudflare + Caddy trên server)
-  API_BASE: 'https://chodocu.vigogroup.vn/api',
+  // Địa chỉ backend (qua Cloudflare, subdomain api của chodocu.cc.cd)
+  API_BASE: 'https://api.chodocu.cc.cd/api',
 
   SUPABASE_URL: 'https://ovxnlepmewindufcgxln.supabase.co',
 
