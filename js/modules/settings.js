@@ -14,7 +14,9 @@ PU.modules.settings = (function () {
   const inputIdOf = key => `setting-${key}`;
 
   async function load() {
-    $('connApi').textContent = cfg.API_BASE;
+    $('connApi').textContent = cfg.API_BASE.startsWith('/') && typeof location !== 'undefined'
+      ? location.origin + cfg.API_BASE
+      : cfg.API_BASE;
     $('connSupabase').textContent = cfg.SUPABASE_URL;
 
     const box = $('settingsList');

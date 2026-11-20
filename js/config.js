@@ -3,31 +3,38 @@
    ============================================================================= */
 window.PU = window.PU || {};
 
-PU.config = {
-  // Địa chỉ backend (qua Cloudflare, subdomain api của chodocu.cc.cd)
-  API_BASE: 'https://api.chodocu.cc.cd/api',
+PU.config = (function () {
+  var host = (typeof location !== 'undefined' && location.hostname) || '';
+  var sameOriginProxy = host === 'chodocu.cc.cd' || host === 'www.chodocu.cc.cd';
 
-  SUPABASE_URL: 'https://ovxnlepmewindufcgxln.supabase.co',
+  return {
+    // Trên chodocu.cc.cd gọi thẳng '/api' cùng origin (Nginx proxy_pass 127.0.0.1:8080):
+    // 0 tốn DNS/TLS phụ, 0 tốn CORS preflight OPTIONS, dùng chung kết nối HTTP/2 sẵn có.
+    // Khi mở file:// hoặc localhost thì gọi qua https://api.chodocu.cc.cd/api.
+    API_BASE: sameOriginProxy ? '/api' : 'https://api.chodocu.cc.cd/api',
 
-  // Khoá lưu phiên đăng nhập & cache hiển thị nhanh
-  TOKEN_KEY: 'chodocu_admin_token',
-  ROLE_KEY: 'chodocu_admin_role',
-  USER_KEY: 'chodocu_admin_user',
-  CACHE_PREFIX: 'chodocu_swr_v1:',
+    SUPABASE_URL: 'https://ovxnlepmewindufcgxln.supabase.co',
 
-  // Vai trò được phép vào trang quản trị
-  ALLOWED_ROLES: ['ADMIN', 'MODERATOR'],
+    // Khoá lưu phiên đăng nhập & cache hiển thị nhanh
+    TOKEN_KEY: 'chodocu_admin_token',
+    ROLE_KEY: 'chodocu_admin_role',
+    USER_KEY: 'chodocu_admin_user',
+    CACHE_PREFIX: 'chodocu_swr_v1:',
 
-  // Kích thước trang mặc định để tránh tải toàn bộ bảng từ Supabase
-  DEFAULT_PAGE_SIZE: 15,
-  PENDING_PAGE_SIZE: 20,
+    // Vai trò được phép vào trang quản trị
+    ALLOWED_ROLES: ['ADMIN', 'MODERATOR'],
 
-  // Thời gian giữ dữ liệu màn hình khi chuyển qua lại giữa các tab (ms)
-  SECTION_CACHE_TTL_MS: 45 * 1000,
+    // Kích thước trang mặc định để tránh tải toàn bộ bảng từ Supabase
+    DEFAULT_PAGE_SIZE: 15,
+    PENDING_PAGE_SIZE: 20,
 
-  // Màn "Duyệt bài đăng" tự tải lại hàng chờ sau mỗi khoảng này (ms)
-  PENDING_REFRESH_MS: 60 * 1000,
+    // Thời gian giữ dữ liệu màn hình khi chuyển qua lại giữa các tab (ms)
+    SECTION_CACHE_TTL_MS: 45 * 1000,
 
-  // Tự làm mới toàn trang theo chu kỳ (ms). 0 = tắt
-  REFRESH_INTERVAL_MS: 0
-};
+    // Màn "Duyệt bài đăng" tự tải lại hàng chờ sau mỗi khoảng này (ms)
+    PENDING_REFRESH_MS: 60 * 1000,
+
+    // Tự làm mới toàn trang theo chu kỳ (ms). 0 = tắt
+    REFRESH_INTERVAL_MS: 0
+  };
+})();
