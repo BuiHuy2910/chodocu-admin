@@ -45,33 +45,42 @@ PU.modules.products = (function () {
   }
 
   /* ---------------------------------- BẢNG ---------------------------------- */
+  function paintTable(data) {
+    const body = $('productsBody');
+    items = (data && data.content) || [];
+    body.innerHTML = items.length
+      ? items.map(row).join('')
+      : ui.emptyRow(COLUMNS, 'Không có sản phẩm', 'Thử đổi bộ lọc trạng thái hoặc từ khoá tìm kiếm.');
+
+    ui.renderPager('productsPager', data, {
+      unit: 'sản phẩm',
+      onPage: next => { page = next; load(); },
+      onSize: nextSize => { size = nextSize; page = 0; load(); }
+    });
+  }
+
   async function load() {
     if (aborter) aborter.abort();
     aborter = new AbortController();
 
     const body = $('productsBody');
-    body.innerHTML = ui.skeletonRows(COLUMNS, 5);
     const status = $('productStatusFilter').value;
     const keyword = $('productSearch').value.trim();
+    const path = '/admin/products' + http.query({ status, keyword, page, size });
+
+    const cached = http.peek(path);
+    if (cached) paintTable(cached);
+    else body.innerHTML = ui.skeletonRows(COLUMNS, 5);
 
     try {
-      const data = await http.get('/admin/products' + http.query({ status, keyword, page, size }), {
-        signal: aborter.signal
-      });
-      items = (data && data.content) || [];
-      body.innerHTML = items.length
-        ? items.map(row).join('')
-        : ui.emptyRow(COLUMNS, 'Không có sản phẩm', 'Thử đổi bộ lọc trạng thái hoặc từ khoá tìm kiếm.');
-
-      ui.renderPager('productsPager', data, {
-        unit: 'sản phẩm',
-        onPage: next => { page = next; load(); },
-        onSize: nextSize => { size = nextSize; page = 0; load(); }
-      });
+      const data = await http.get(path, { signal: aborter.signal });
+      paintTable(data);
     } catch (e) {
       if (e && e.aborted) return;
-      body.innerHTML = ui.emptyRow(COLUMNS, 'Không tải được danh sách sản phẩm', e.message);
-      ui.renderPager('productsPager', null);
+      if (!cached) {
+        body.innerHTML = ui.emptyRow(COLUMNS, 'Không tải được danh sách sản phẩm', e.message);
+        ui.renderPager('productsPager', null);
+      }
     }
   }
 

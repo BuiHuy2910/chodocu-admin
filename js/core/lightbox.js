@@ -36,9 +36,10 @@ PU.lightbox = (function () {
 
   function paint() {
     const stage = $('lightboxStage');
+    const src = ui.resolveMediaUrl ? ui.resolveMediaUrl(urls[index]) : urls[index];
     stage.classList.remove('is-broken');
     stage.innerHTML = `
-      <img src="${ui.esc(urls[index])}" alt="Ảnh ${index + 1}" onerror="PU.ui.imgFail(this)" />
+      <img src="${ui.esc(src)}" alt="Ảnh ${index + 1}" decoding="async" onerror="PU.ui.imgFail(this)" />
       <div class="pu-lightbox__broken">
         <span class="material-symbols-outlined">image_not_supported</span>Không tải được ảnh
       </div>`;

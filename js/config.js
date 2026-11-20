@@ -9,9 +9,11 @@ PU.config = {
 
   SUPABASE_URL: 'https://ovxnlepmewindufcgxln.supabase.co',
 
-  // Khoá lưu phiên đăng nhập trong localStorage
+  // Khoá lưu phiên đăng nhập & cache hiển thị nhanh
   TOKEN_KEY: 'chodocu_admin_token',
   ROLE_KEY: 'chodocu_admin_role',
+  USER_KEY: 'chodocu_admin_user',
+  CACHE_PREFIX: 'chodocu_swr_v1:',
 
   // Vai trò được phép vào trang quản trị
   ALLOWED_ROLES: ['ADMIN', 'MODERATOR'],
@@ -21,7 +23,7 @@ PU.config = {
   PENDING_PAGE_SIZE: 20,
 
   // Thời gian giữ dữ liệu màn hình khi chuyển qua lại giữa các tab (ms)
-  SECTION_CACHE_TTL_MS: 30 * 1000,
+  SECTION_CACHE_TTL_MS: 45 * 1000,
 
   // Màn "Duyệt bài đăng" tự tải lại hàng chờ sau mỗi khoảng này (ms)
   PENDING_REFRESH_MS: 60 * 1000,

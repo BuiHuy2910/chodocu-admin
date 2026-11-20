@@ -42,33 +42,42 @@ PU.modules.orders = (function () {
     load();
   }
 
+  function paintTable(data) {
+    const body = $('ordersBody');
+    const orders = (data && data.content) || [];
+    body.innerHTML = orders.length
+      ? orders.map(row).join('')
+      : ui.emptyRow(COLUMNS, 'Không có đơn hàng', 'Chưa có đơn nào khớp bộ lọc hiện tại.');
+
+    ui.renderPager('ordersPager', data, {
+      unit: 'đơn hàng',
+      onPage: next => { page = next; load(); },
+      onSize: nextSize => { size = nextSize; page = 0; load(); }
+    });
+  }
+
   async function load() {
     if (aborter) aborter.abort();
     aborter = new AbortController();
 
     const body = $('ordersBody');
-    body.innerHTML = ui.skeletonRows(COLUMNS, 5);
     const status = $('orderStatusFilter').value;
     const keyword = ($('orderSearch') && $('orderSearch').value.trim()) || '';
+    const path = '/admin/orders' + http.query({ status, keyword, page, size });
+
+    const cached = http.peek(path);
+    if (cached) paintTable(cached);
+    else body.innerHTML = ui.skeletonRows(COLUMNS, 5);
 
     try {
-      const data = await http.get('/admin/orders' + http.query({ status, keyword, page, size }), {
-        signal: aborter.signal
-      });
-      const orders = (data && data.content) || [];
-      body.innerHTML = orders.length
-        ? orders.map(row).join('')
-        : ui.emptyRow(COLUMNS, 'Không có đơn hàng', 'Chưa có đơn nào khớp bộ lọc hiện tại.');
-
-      ui.renderPager('ordersPager', data, {
-        unit: 'đơn hàng',
-        onPage: next => { page = next; load(); },
-        onSize: nextSize => { size = nextSize; page = 0; load(); }
-      });
+      const data = await http.get(path, { signal: aborter.signal });
+      paintTable(data);
     } catch (e) {
       if (e && e.aborted) return;
-      body.innerHTML = ui.emptyRow(COLUMNS, 'Không tải được đơn hàng', e.message);
-      ui.renderPager('ordersPager', null);
+      if (!cached) {
+        body.innerHTML = ui.emptyRow(COLUMNS, 'Không tải được đơn hàng', e.message);
+        ui.renderPager('ordersPager', null);
+      }
     }
   }
 

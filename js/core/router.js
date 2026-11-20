@@ -1,14 +1,14 @@
 /* =============================================================================
-   Router: chuyển giữa các mục (section) + nhớ ngắn hạn để tránh gọi lại API thừa
+   Router: chuyển mục tức thì + tải trước (prefetch) khi rê chuột vào thanh bên
    ============================================================================= */
 window.PU = window.PU || {};
 
 PU.router = (function () {
   const ui = PU.ui;
   const cfg = PU.config;
+  const http = PU.http;
   const $ = id => document.getElementById(id);
 
-  // tên mục → [tiêu đề, mô tả] hiển thị trên thanh trên cùng
   const SECTIONS = {
     dashboard: ['Tổng quan', 'Bảng điều khiển Chợ Đồ Cũ'],
     pending:   ['Duyệt bài đăng', 'Hàng chờ phê duyệt từ sinh viên'],
@@ -20,11 +20,22 @@ PU.router = (function () {
     settings:  ['Cài đặt hệ thống', 'Cấu hình toàn hệ thống']
   };
 
+  // Endpoint mặc định của từng mục để prefetch ngay khi rê chuột lên menu
+  const PREFETCH_PATHS = {
+    dashboard: () => '/admin/stats',
+    pending:   () => `/admin/products/pending-queue?sort=oldest&page=0&size=${cfg.PENDING_PAGE_SIZE || 20}`,
+    products:  () => `/admin/products?page=0&size=${cfg.DEFAULT_PAGE_SIZE || 15}`,
+    orders:    () => `/admin/orders?page=0&size=${cfg.DEFAULT_PAGE_SIZE || 15}`,
+    financial: () => '/admin/financial?page=0&size=10',
+    users:     () => `/admin/users?page=0&size=${cfg.DEFAULT_PAGE_SIZE || 15}`,
+    reports:   () => `/admin/reports?status=ALL&page=0&size=${cfg.DEFAULT_PAGE_SIZE || 15}`,
+    settings:  () => '/admin/settings'
+  };
+
   let current = 'dashboard';
   const loading = {};
-  const loadedAt = {}; // tên mục → thời điểm tải thành công gần nhất (ms)
+  const loadedAt = {};
 
-  // Mục gắn data-admin-only thì chỉ ADMIN được mở
   function canOpen(name) {
     if (!SECTIONS[name]) return false;
     const section = $('section-' + name);
@@ -73,13 +84,12 @@ PU.router = (function () {
     }
   }
 
-  // Nút "Làm mới" luôn tải dữ liệu mới từ server
   function reload() {
+    http.clearCache();
     invalidate(current);
     load(current);
   }
 
-  // Đánh dấu các mục cần tải lại sau khi dữ liệu thay đổi
   function invalidate(...names) {
     if (!names.length) {
       Object.keys(loadedAt).forEach(k => delete loadedAt[k]);
@@ -88,9 +98,30 @@ PU.router = (function () {
     names.forEach(n => delete loadedAt[n]);
   }
 
+  function prefetchSection(name) {
+    if (!name || name === current || isFresh(name) || !canOpen(name)) return;
+    const fn = PREFETCH_PATHS[name];
+    if (fn) http.prefetch(fn());
+  }
+
+  function bindPrefetch() {
+    let hoverTimer = null;
+    document.querySelectorAll('.pu-nav__item[data-nav]').forEach(btn => {
+      const name = btn.getAttribute('data-nav');
+      btn.addEventListener('pointerenter', () => {
+        clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => prefetchSection(name), 65);
+      });
+      btn.addEventListener('pointerleave', () => clearTimeout(hoverTimer));
+      btn.addEventListener('touchstart', () => prefetchSection(name), { passive: true });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', bindPrefetch);
+
   function currentSection() {
     return current;
   }
 
-  return { go, reload, load, invalidate, currentSection, SECTIONS };
+  return { go, reload, load, invalidate, prefetchSection, currentSection, SECTIONS };
 })();

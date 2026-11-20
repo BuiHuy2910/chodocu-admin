@@ -156,9 +156,31 @@ PU.ui = (function () {
   function statusLabel(status) { return (STATUS_MAP[status] || [status || '—'])[0]; }
 
   /* ------------------------------ ẢNH & AVATAR ------------------------------ */
-  function imgTag(url, alt) {
+  const apiOrigin = (PU.config && PU.config.API_BASE || '').replace(/\/api\/?$/, '');
+
+  // Chuẩn hoá URL ảnh (hỗ trợ cả đường dẫn tương đối /uploads/... từ VPS)
+  // và tự thu nhỏ ảnh thumbnail để tiết kiệm băng thông hàng chục lần.
+  function resolveMediaUrl(url, thumbWidth) {
     if (!url) return '';
-    return `<img src="${esc(url)}" alt="${esc(alt || '')}" loading="lazy" decoding="async" onerror="PU.ui.imgFail(this)" />`;
+    let clean = String(url).trim();
+    if (clean.startsWith('/uploads/') && apiOrigin) {
+      clean = apiOrigin + clean;
+    }
+    if (thumbWidth && clean.includes('images.unsplash.com/')) {
+      clean = clean
+        .replace(/([?&])w=\d+/, `$1w=${thumbWidth}`)
+        .replace(/([?&])q=\d+/, '$1q=70');
+      if (!/[?&]w=/.test(clean)) {
+        clean += (clean.includes('?') ? '&' : '?') + `w=${thumbWidth}&q=70&auto=format&fit=crop`;
+      }
+    }
+    return clean;
+  }
+
+  function imgTag(url, alt, thumbWidth) {
+    const resolved = resolveMediaUrl(url, thumbWidth);
+    if (!resolved) return '';
+    return `<img src="${esc(resolved)}" alt="${esc(alt || '')}" loading="lazy" decoding="async" fetchpriority="low" onerror="PU.ui.imgFail(this)" />`;
   }
 
   function imgFail(img) {
@@ -166,17 +188,18 @@ PU.ui = (function () {
     img.remove();
   }
 
-  function thumbInner(url, alt) {
-    return `<span class="material-symbols-outlined">image_not_supported</span>${imgTag(url, alt)}`;
+  function thumbInner(url, alt, thumbWidth) {
+    return `<span class="material-symbols-outlined">image_not_supported</span>${imgTag(url, alt, thumbWidth)}`;
   }
 
   function thumb(url, className) {
-    return `<span class="pu-thumb ${className || ''}">${thumbInner(url)}</span>`;
+    return `<span class="pu-thumb ${className || ''}">${thumbInner(url, '', 120)}</span>`;
   }
 
   function avatar(name, url, size) {
     const tone = hashText(name) % 4;
-    return `<span class="pu-avatar pu-avatar--${size || 'sm'} pu-avatar--tone${tone}" aria-hidden="true">${initials(name)}${imgTag(url)}</span>`;
+    const px = size === 'lg' ? 96 : 72;
+    return `<span class="pu-avatar pu-avatar--${size || 'sm'} pu-avatar--tone${tone}" aria-hidden="true">${initials(name)}${imgTag(url, '', px)}</span>`;
   }
 
   function hashText(text) {
@@ -390,7 +413,7 @@ PU.ui = (function () {
     fmt, fmtNum, fmtPct, parseDate, fmtDate, fmtDay, duration,
     esc, normalize, initials, debounce,
     statusBadge, statusLabel, roleBadge, actionBadge,
-    thumb, thumbInner, avatar, imgFail, historyList, renderPager,
+    thumb, thumbInner, avatar, imgFail, resolveMediaUrl, historyList, renderPager,
     toast, openModal, closeModal, closeAllModals, isModalOpen, anyModalOpen,
     confirmDialog, askNote,
     skeleton, skeletonRows, emptyRow, emptyState,

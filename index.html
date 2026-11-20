@@ -9,13 +9,40 @@
   <link rel="icon" type="image/png" sizes="192x192" href="assets/brand/logo-mark-192.png" />
   <link rel="apple-touch-icon" href="assets/brand/logo-mark-192.png" />
 
+  <!-- Khởi tạo kết nối TLS sớm tới VPS API & Supabase Storage ngay khi đọc HTML -->
+  <link rel="preconnect" href="https://api.chodocu.cc.cd" crossorigin />
+  <link rel="preconnect" href="https://ovxnlepmewindufcgxln.supabase.co" crossorigin />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet" />
+  <link rel="dns-prefetch" href="https://images.unsplash.com" />
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
 
-  <link rel="stylesheet" href="css/admin.css" />
-  <script id="chartScript" defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Mở ngay khung ứng dụng từ Frame 1 nếu còn phiên đăng nhập (chống nháy màn Login) -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('chodocu_admin_token');
+        var r = localStorage.getItem('chodocu_admin_role');
+        if (t && (r === 'ADMIN' || r === 'MODERATOR')) {
+          var root = document.documentElement;
+          root.classList.add('has-session');
+          if (r === 'MODERATOR') root.classList.add('is-moderator');
+        }
+      } catch (_) {}
+    })();
+  </script>
+
+  <link rel="stylesheet" href="dist/admin.min.css?v=fe483e2587" />
+
+  <!-- Nạp font chữ & biểu tượng bất đồng bộ (không chặn First Contentful Paint) -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" media="print" onload="this.media='all'" />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block" media="print" onload="this.media='all'" />
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block" />
+  </noscript>
 </head>
 <body>
 
@@ -856,25 +883,8 @@
 <div id="toasts" class="pu-toasts" aria-live="polite"></div>
 
 <!-- ============================ SCRIPT ============================
-     Thứ tự quan trọng: config → core (http, ui, product, lightbox, auth, router)
-     → các module → app.js (khởi động). -->
-<script src="js/config.js"></script>
-<script src="js/core/http.js"></script>
-<script src="js/core/ui.js"></script>
-<script src="js/core/product.js"></script>
-<script src="js/core/lightbox.js"></script>
-<script src="js/core/auth.js"></script>
-<script src="js/core/router.js"></script>
-<script src="js/modules/dashboard.js"></script>
-<script src="js/modules/pending-checks.js"></script>
-<script src="js/modules/pending-view.js"></script>
-<script src="js/modules/pending.js"></script>
-<script src="js/modules/products.js"></script>
-<script src="js/modules/orders.js"></script>
-<script src="js/modules/financial.js"></script>
-<script src="js/modules/users.js"></script>
-<script src="js/modules/reports.js"></script>
-<script src="js/modules/settings.js"></script>
-<script src="js/app.js"></script>
+     Toàn bộ 18 file JS trong js/ được gộp thành 1 bundle duy nhất (dist/app.min.js?v=6bb0ed6041)
+     bằng lệnh: node scripts/build.js (giảm từ 18 HTTP request xuống 1 request trên VPS). -->
+<script defer src="dist/app.min.js?v=6bb0ed6041"></script>
 </body>
 </html>

@@ -1,0 +1,46 @@
+# =============================================================================
+# Cấu hình Caddy chuẩn hiệu năng cao trên VPS cho Chợ Đồ Cũ (chodocu.cc.cd)
+# Giúp Cloudflare Edge (Singapore) cache cứng CSS/JS/Logo 1 năm (HIT ~15ms)
+# thay vì REVALIDATED vòng về VPS mỗi lần tải trang.
+# =============================================================================
+
+chodocu.cc.cd {
+    root * /var/www/chodocu-admin
+    encode zstd gzip
+
+    @immutable path /dist/* /assets/*
+    header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+    @html path / /index.html
+    header @html Cache-Control "public, max-age=0, must-revalidate"
+
+    header {
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    file_server
+}
+
+api.chodocu.cc.cd {
+    encode zstd gzip
+
+    # Tối ưu nhảy preflight CORS ngay tại tầng Caddy (0ms chạm vào Java)
+    @cors_preflight method OPTIONS
+    handle @cors_preflight {
+        header Access-Control-Allow-Origin "{http.request.header.Origin}"
+        header Access-Control-Allow-Methods "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS"
+        header Access-Control-Allow-Headers "Authorization, Content-Type, Accept, Origin, X-Requested-With"
+        header Access-Control-Allow-Credentials "true"
+        header Access-Control-Max-Age "86400"
+        header Vary "Origin"
+        respond "" 204
+    }
+
+    reverse_proxy 127.0.0.1:8080 {
+        transport http {
+            keepalive 60s
+            keepalive_idle_conns 32
+        }
+    }
+}

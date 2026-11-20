@@ -1,5 +1,5 @@
 /* =============================================================================
-   Module: Tổng quan — 1 request duy nhất tới /admin/stats + 2 biểu đồ (Chart.js)
+   Module: Tổng quan — SWR hiển thị tức thì 0ms + nạp lười (lazy-load) Chart.js
    ============================================================================= */
 window.PU = window.PU || {};
 PU.modules = PU.modules || {};
@@ -8,23 +8,33 @@ PU.modules.dashboard = (function () {
   const http = PU.http;
   const ui = PU.ui;
 
+  const CHART_CDN = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
   const PALETTE = ['#0B6B4A', '#B4530A', '#0D5C8C', '#5B3E96', '#B42318', '#6B7A5E', '#8A6D3B', '#4F6B82'];
   const charts = {};
   let latestStats = null;
-  let chartListenerBound = false;
+  let chartPromise = null;
 
   function setText(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
   }
 
-  async function load() {
-    const stats = await http.get('/admin/stats');
+  function applyStats(stats) {
+    if (!stats) return;
     latestStats = stats;
     showStats(stats);
     ui.setBadge('pendingBadge', stats.pendingProducts);
     if (stats.pendingReports != null) ui.setBadge('reportBadge', stats.pendingReports);
     paintCharts(stats);
+  }
+
+  async function load() {
+    // Hiển thị ngay bản lưu gần nhất trong 0ms nếu có, sau đó làm mới ngầm từ VPS
+    const cached = http.peek('/admin/stats');
+    if (cached) applyStats(cached);
+
+    const stats = await http.get('/admin/stats');
+    applyStats(stats);
   }
 
   function showStats(stats) {
@@ -38,16 +48,33 @@ PU.modules.dashboard = (function () {
     setText('stat-revenue', stats.totalPlatformFees != null ? ui.fmt(stats.totalPlatformFees) : '—');
   }
 
-  /* --------------------------------- BIỂU ĐỒ --------------------------------- */
+  /* ----------------------- NẠP LƯỜI THƯ VIỆN CHART.JS ------------------------ */
+  function ensureChartJs() {
+    if (typeof window.Chart !== 'undefined') return Promise.resolve(true);
+    if (chartPromise) return chartPromise;
+
+    chartPromise = new Promise(resolve => {
+      const script = document.createElement('script');
+      script.src = CHART_CDN;
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => {
+        chartPromise = null;
+        resolve(false);
+      };
+      document.head.appendChild(script);
+    });
+    return chartPromise;
+  }
+
   function paintCharts(stats) {
     if (typeof window.Chart === 'undefined') {
-      const script = document.getElementById('chartScript');
-      if (script && !chartListenerBound) {
-        chartListenerBound = true;
-        script.addEventListener('load', () => {
-          if (latestStats) paintCharts(latestStats);
+      const schedule = window.requestIdleCallback || (fn => setTimeout(fn, 60));
+      schedule(() => {
+        ensureChartJs().then(ok => {
+          if (ok && latestStats) paintCharts(latestStats);
         });
-      }
+      });
       return;
     }
     drawChart('chartCategory', categoryChart(stats.productsByCategory || {}));
@@ -69,6 +96,7 @@ PU.modules.dashboard = (function () {
         datasets: [{ data: Object.values(data), backgroundColor: PALETTE, borderWidth: 2, borderColor: '#fff' }]
       },
       options: {
+        animation: false,
         maintainAspectRatio: false,
         cutout: '62%',
         plugins: {
@@ -86,6 +114,7 @@ PU.modules.dashboard = (function () {
         datasets: [{ label: 'Tin đăng', data: Object.values(data), backgroundColor: '#0B6B4ACC', borderRadius: 6, maxBarThickness: 34 }]
       },
       options: {
+        animation: false,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {

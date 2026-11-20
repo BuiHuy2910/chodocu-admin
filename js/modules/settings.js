@@ -16,10 +16,19 @@ PU.modules.settings = (function () {
   async function load() {
     $('connApi').textContent = cfg.API_BASE;
     $('connSupabase').textContent = cfg.SUPABASE_URL;
-    setConnectionStatus('pending');
 
     const box = $('settingsList');
-    box.innerHTML = ui.skeleton(3);
+    const cached = http.peek('/admin/settings');
+    if (cached) {
+      setConnectionStatus('ok');
+      box.innerHTML = cached.length
+        ? cached.map(settingRow).join('')
+        : ui.emptyState('Chưa có cấu hình', '', 'tune');
+    } else {
+      setConnectionStatus('pending');
+      box.innerHTML = ui.skeleton(3);
+    }
+
     try {
       const settings = (await http.get('/admin/settings')) || [];
       setConnectionStatus('ok');
@@ -28,7 +37,7 @@ PU.modules.settings = (function () {
         : ui.emptyState('Chưa có cấu hình', '', 'tune');
     } catch (e) {
       setConnectionStatus('err');
-      box.innerHTML = ui.emptyState('Không tải được cài đặt', e.message, 'error');
+      if (!cached) box.innerHTML = ui.emptyState('Không tải được cài đặt', e.message, 'error');
     }
   }
 

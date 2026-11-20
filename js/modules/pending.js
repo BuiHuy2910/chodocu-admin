@@ -67,16 +67,20 @@ PU.modules.pending = (function () {
     };
   }
 
-  function fetchQueue(signal) {
+  function queuePath() {
     const f = readFilters();
-    return http.get('/admin/products/pending-queue' + http.query({
+    return '/admin/products/pending-queue' + http.query({
       keyword: f.keyword,
       category: f.category,
       school: f.school,
       sort: f.sort,
       page: state.page,
       size: state.size
-    }), signal ? { signal } : undefined);
+    });
+  }
+
+  function fetchQueue(signal) {
+    return http.get(queuePath(), signal ? { signal } : undefined);
   }
 
   async function load() {
@@ -85,19 +89,29 @@ PU.modules.pending = (function () {
     aborter = new AbortController();
 
     closeDrawer();
-    state.phase = 'loading';
-    render();
+    const cached = http.peek(queuePath());
+    if (cached) {
+      setData(cached);
+      state.phase = 'ready';
+      render();
+    } else {
+      state.phase = 'loading';
+      render();
+    }
+
     try {
       const payload = await fetchQueue(aborter.signal);
       setData(payload);
       state.phase = 'ready';
     } catch (e) {
       if (e && e.aborted) return;
-      setData(null);
-      state.phase = 'error';
-      state.error = e.message || 'Lỗi không xác định.';
+      if (!cached) {
+        setData(null);
+        state.phase = 'error';
+        state.error = e.message || 'Lỗi không xác định.';
+      }
     }
-    render();
+    render({ keepReview: !!cached });
   }
 
   async function refreshQuietly(options) {

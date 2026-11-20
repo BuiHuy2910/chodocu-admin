@@ -39,33 +39,42 @@ PU.modules.users = (function () {
   }
 
   /* ---------------------------------- BẢNG ---------------------------------- */
+  function paintTable(data) {
+    const body = $('usersBody');
+    items = (data && data.content) || [];
+    body.innerHTML = items.length
+      ? items.map(row).join('')
+      : ui.emptyRow(COLUMNS, 'Không tìm thấy người dùng', 'Thử đổi từ khoá hoặc bộ lọc vai trò.');
+
+    ui.renderPager('usersPager', data, {
+      unit: 'người dùng',
+      onPage: next => { page = next; load(); },
+      onSize: nextSize => { size = nextSize; page = 0; load(); }
+    });
+  }
+
   async function load() {
     if (aborter) aborter.abort();
     aborter = new AbortController();
 
     const body = $('usersBody');
-    body.innerHTML = ui.skeletonRows(COLUMNS, 6);
     const role = $('userRoleFilter').value;
     const keyword = $('userSearch').value.trim();
+    const path = '/admin/users' + http.query({ role, keyword, page, size });
+
+    const cached = http.peek(path);
+    if (cached) paintTable(cached);
+    else body.innerHTML = ui.skeletonRows(COLUMNS, 6);
 
     try {
-      const data = await http.get('/admin/users' + http.query({ role, keyword, page, size }), {
-        signal: aborter.signal
-      });
-      items = (data && data.content) || [];
-      body.innerHTML = items.length
-        ? items.map(row).join('')
-        : ui.emptyRow(COLUMNS, 'Không tìm thấy người dùng', 'Thử đổi từ khoá hoặc bộ lọc vai trò.');
-
-      ui.renderPager('usersPager', data, {
-        unit: 'người dùng',
-        onPage: next => { page = next; load(); },
-        onSize: nextSize => { size = nextSize; page = 0; load(); }
-      });
+      const data = await http.get(path, { signal: aborter.signal });
+      paintTable(data);
     } catch (e) {
       if (e && e.aborted) return;
-      body.innerHTML = ui.emptyRow(COLUMNS, 'Không tải được người dùng', e.message);
-      ui.renderPager('usersPager', null);
+      if (!cached) {
+        body.innerHTML = ui.emptyRow(COLUMNS, 'Không tải được người dùng', e.message);
+        ui.renderPager('usersPager', null);
+      }
     }
   }
 

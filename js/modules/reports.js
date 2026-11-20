@@ -31,36 +31,45 @@ PU.modules.reports = (function () {
     load();
   }
 
+  function paintTable(data) {
+    const body = $('reportsBody');
+    const list = (data && data.content) || [];
+    if (data && data.meta && data.meta.pendingCount != null) {
+      ui.setBadge('reportBadge', data.meta.pendingCount);
+    }
+    body.innerHTML = list.length
+      ? list.map(row).join('')
+      : ui.emptyRow(COLUMNS, 'Không có báo cáo', 'Chưa có báo cáo nào khớp bộ lọc.');
+
+    ui.renderPager('reportsPager', data, {
+      unit: 'báo cáo',
+      onPage: next => { page = next; load(); },
+      onSize: nextSize => { size = nextSize; page = 0; load(); }
+    });
+  }
+
   async function load() {
     if (aborter) aborter.abort();
     aborter = new AbortController();
 
     const body = $('reportsBody');
-    body.innerHTML = ui.skeletonRows(COLUMNS, 4);
     const status = $('reportStatusFilter').value || 'ALL';
     const keyword = ($('reportSearch') && $('reportSearch').value.trim()) || '';
+    const path = '/admin/reports' + http.query({ status, keyword, page, size });
+
+    const cached = http.peek(path);
+    if (cached) paintTable(cached);
+    else body.innerHTML = ui.skeletonRows(COLUMNS, 4);
 
     try {
-      const data = await http.get('/admin/reports' + http.query({ status, keyword, page, size }), {
-        signal: aborter.signal
-      });
-      const list = (data && data.content) || [];
-      if (data && data.meta && data.meta.pendingCount != null) {
-        ui.setBadge('reportBadge', data.meta.pendingCount);
-      }
-      body.innerHTML = list.length
-        ? list.map(row).join('')
-        : ui.emptyRow(COLUMNS, 'Không có báo cáo', 'Chưa có báo cáo nào khớp bộ lọc.');
-
-      ui.renderPager('reportsPager', data, {
-        unit: 'báo cáo',
-        onPage: next => { page = next; load(); },
-        onSize: nextSize => { size = nextSize; page = 0; load(); }
-      });
+      const data = await http.get(path, { signal: aborter.signal });
+      paintTable(data);
     } catch (e) {
       if (e && e.aborted) return;
-      body.innerHTML = ui.emptyRow(COLUMNS, 'Không tải được báo cáo', e.message);
-      ui.renderPager('reportsPager', null);
+      if (!cached) {
+        body.innerHTML = ui.emptyRow(COLUMNS, 'Không tải được báo cáo', e.message);
+        ui.renderPager('reportsPager', null);
+      }
     }
   }
 

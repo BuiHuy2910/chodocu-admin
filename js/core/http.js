@@ -1,11 +1,18 @@
 /* =============================================================================
-   HTTP client — gắn Bearer token, gộp GET trùng lặp, hỗ trợ AbortController
+   HTTP client — tối ưu VPS:
+   - Không gửi header thừa trên GET để giảm preflight CORS
+   - Gộp các GET trùng lặp đang bay
+   - Cache Stale-While-Revalidate (RAM + sessionStorage) hiển thị tức thì 0ms
+   - Tự động xoá cache ngay khi có thao tác ghi (POST/PUT/PATCH/DELETE)
    ============================================================================= */
 window.PU = window.PU || {};
 
 PU.http = (function () {
   const cfg = PU.config;
-  const inflightGets = new Map(); // path → Promise (chống bắn trùng GET cùng lúc)
+  const inflightGets = new Map();
+  const memCache = new Map(); // path → { data, at }
+  const CACHE_PREFIX = cfg.CACHE_PREFIX || 'chodocu_swr_v1:';
+  const PREFETCH_TTL = cfg.SECTION_CACHE_TTL_MS || 45000;
 
   function getToken() {
     return PU._token || localStorage.getItem(cfg.TOKEN_KEY) || '';
@@ -27,7 +34,6 @@ PU.http = (function () {
     else localStorage.removeItem(cfg.ROLE_KEY);
   }
 
-  // Ghép object thành "?a=1&b=2", tự bỏ qua các tham số rỗng/null
   function query(params) {
     if (!params) return '';
     const usp = new URLSearchParams();
@@ -41,10 +47,63 @@ PU.http = (function () {
     return str ? '?' + str : '';
   }
 
+  /* ------------------------- CACHE PHẢN HỒI (SWR) ------------------------- */
+  function writeCache(path, data) {
+    if (!path || path.startsWith('/auth/')) return;
+    const entry = { data, at: Date.now() };
+    memCache.set(path, entry);
+    try {
+      sessionStorage.setItem(CACHE_PREFIX + path, JSON.stringify(entry));
+    } catch (_) {
+      // sessionStorage đầy thì chỉ giữ trong RAM
+    }
+  }
+
+  function peekEntry(path) {
+    if (!path) return null;
+    if (memCache.has(path)) return memCache.get(path);
+    try {
+      const raw = sessionStorage.getItem(CACHE_PREFIX + path);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && 'data' in parsed) {
+        memCache.set(path, parsed);
+        return parsed;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Đọc nhanh bản lưu gần nhất (0ms) để vẽ giao diện ngay trước khi mạng trả về
+  function peek(path) {
+    const entry = peekEntry(path);
+    return entry ? entry.data : null;
+  }
+
+  function clearCache() {
+    memCache.clear();
+    try {
+      const keys = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k && k.startsWith(CACHE_PREFIX)) keys.push(k);
+      }
+      keys.forEach(k => sessionStorage.removeItem(k));
+    } catch (_) {}
+  }
+
+  // Tải trước ngầm khi rê chuột lên menu (bỏ qua nếu vừa tải chưa quá TTL)
+  function prefetch(path) {
+    if (!path || !getToken()) return;
+    const hit = peekEntry(path);
+    if (hit && Date.now() - hit.at < PREFETCH_TTL) return;
+    request(path, 'GET').catch(() => {});
+  }
+
   function friendly(message, status) {
     const m = String(message || '');
     if (m.includes('Failed to fetch') || m.includes('NetworkError') || m.includes('ERR_CONNECTION')) {
-      return 'Không kết nối được backend. Kiểm tra backend đang chạy tại ' + cfg.API_BASE;
+      return 'Không kết nối được backend. Kiểm tra kết nối tới ' + cfg.API_BASE;
     }
     if (status === 401) return m || 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.';
     if (status === 403) return m || 'Bạn không có quyền thực hiện thao tác này.';
@@ -54,15 +113,17 @@ PU.http = (function () {
   }
 
   async function sendRequest(path, method, body, opts) {
-    const options = Object.assign({
-      method: method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + getToken()
-      }
-    }, opts || {});
+    const verb = (method || 'GET').toUpperCase();
+    const hasBody = body !== undefined && body !== null;
+    const token = getToken();
 
-    if (body !== undefined && body !== null) options.body = JSON.stringify(body);
+    const headers = {};
+    if (hasBody) headers['Content-Type'] = 'application/json';
+    if (token) headers.Authorization = 'Bearer ' + token;
+
+    const options = Object.assign({ method: verb }, opts || {});
+    options.headers = Object.assign(headers, (opts && opts.headers) || {});
+    if (hasBody) options.body = JSON.stringify(body);
 
     let res;
     try {
@@ -90,13 +151,18 @@ PU.http = (function () {
       throw err;
     }
 
-    if (data && typeof data === 'object' && 'data' in data && data.data !== undefined) return data.data;
-    return data;
+    const unwrapped = (data && typeof data === 'object' && 'data' in data && data.data !== undefined)
+      ? data.data
+      : data;
+
+    if (verb === 'GET') writeCache(path, unwrapped);
+    else clearCache();
+
+    return unwrapped;
   }
 
   function request(path, method, body, opts) {
     const verb = (method || 'GET').toUpperCase();
-    // Chỉ gộp các request GET không gắn AbortSignal riêng
     if (verb === 'GET' && !(opts && opts.signal)) {
       if (inflightGets.has(path)) return inflightGets.get(path);
       const p = sendRequest(path, verb, null, opts).finally(() => inflightGets.delete(path));
@@ -112,6 +178,9 @@ PU.http = (function () {
     getRole,
     setRole,
     query,
+    peek,
+    prefetch,
+    clearCache,
     get: (p, opts) => request(p, 'GET', null, opts),
     post: (p, b, opts) => request(p, 'POST', b, opts),
     put: (p, b, opts) => request(p, 'PUT', b, opts),

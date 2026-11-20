@@ -24,23 +24,32 @@ PU.modules.financial = (function () {
   }
 
   /* --------------------------------- TẢI DỮ LIỆU ------------------------------ */
+  function applyFinancial(fin) {
+    if (!fin) return;
+    financial = fin;
+    showSummary(fin);
+    fillSettingInputs(fin);
+    showFeeStatus(fin.feeEnabled !== false);
+    renderPreviews(fin.feePreviews || {});
+    renderTiers(fin.feeTiers || []);
+    renderTransactionsPage(fin.transactionsPage || {
+      content: fin.recentTransactions || [],
+      pageNumber: txPage,
+      pageSize: txSize,
+      totalElements: (fin.recentTransactions || []).length,
+      totalPages: 1
+    });
+  }
+
   async function load() {
+    const path = '/admin/financial' + http.query({ page: txPage, size: txSize });
+    const cached = http.peek(path);
+    if (cached) applyFinancial(cached);
+
     try {
-      financial = await http.get('/admin/financial' + http.query({ page: txPage, size: txSize }));
-      showSummary(financial);
-      fillSettingInputs(financial);
-      showFeeStatus(financial.feeEnabled !== false);
-      renderPreviews(financial.feePreviews || {});
-      renderTiers(financial.feeTiers || []);
-      renderTransactionsPage(financial.transactionsPage || {
-        content: financial.recentTransactions || [],
-        pageNumber: txPage,
-        pageSize: txSize,
-        totalElements: (financial.recentTransactions || []).length,
-        totalPages: 1
-      });
+      applyFinancial(await http.get(path));
     } catch (e) {
-      ui.toast(`Không tải được dữ liệu tài chính: ${e.message}`, 'error');
+      if (!cached) ui.toast(`Không tải được dữ liệu tài chính: ${e.message}`, 'error');
     }
   }
 

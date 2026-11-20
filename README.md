@@ -10,7 +10,8 @@ Dùng **REST API của backend Spring Boot** (`/api/**`).
 cd ..\chodocu-backend
 .\mvnw.cmd spring-boot:run
 
-# 2. Mở trang admin
+# 2. Mở trang admin (sau khi sửa code trong css/ hoặc js/, chạy lệnh gộp bundle):
+node scripts/build.js
 start index.html
 # hoặc serve tĩnh (khuyến nghị khi dev):
 python -m http.server 5500

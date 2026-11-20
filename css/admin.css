@@ -75,8 +75,22 @@ img { display: block; max-width: 100%; }
 .hidden { display: none !important; }
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  line-height: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  vertical-align: middle;
+  flex-shrink: 0;
   user-select: none;
 }
+/* Khôi phục phiên tức thì ngay từ <head> để không bao giờ nháy màn hình đăng nhập */
+html.has-session .pu-login { display: none !important; }
+html.has-session .pu-shell { display: flex; }
+html.is-moderator [data-admin-only] { display: none !important; }
 /* Viền xanh khi đi bằng bàn phím (Tab), không hiện khi bấm chuột */
 button:focus-visible, select:focus-visible, input[type="checkbox"]:focus-visible {
   outline: 2px solid var(--emerald);
@@ -630,6 +644,8 @@ button.pu-thumb { cursor: pointer; }
   border-bottom: 1px solid #F1F2F4;
   cursor: pointer;
   transition: background .12s;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
 }
 .pu-queue__item:hover { background: var(--surface-alt); }
 .pu-queue__item.is-checked { background: #F4FAF7; }

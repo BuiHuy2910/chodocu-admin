@@ -1,5 +1,5 @@
 /* =============================================================================
-   Auth: đăng nhập, đăng xuất, khôi phục phiên và ẩn/hiện mục theo vai trò
+   Auth: đăng nhập, đăng xuất, khôi phục phiên song song (0ms nháy màn đăng nhập)
    ============================================================================= */
 window.PU = window.PU || {};
 
@@ -8,16 +8,44 @@ PU.auth = (function () {
   const http = PU.http;
   const ui = PU.ui;
   const $ = id => document.getElementById(id);
+  const USER_KEY = cfg.USER_KEY || 'chodocu_admin_user';
 
   let currentUser = null;
 
+  function saveCachedUser(user) {
+    if (!user) {
+      localStorage.removeItem(USER_KEY);
+      return;
+    }
+    try {
+      localStorage.setItem(USER_KEY, JSON.stringify({
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
+        role: user.role
+      }));
+    } catch (_) {}
+  }
+
+  function readCachedUser() {
+    try {
+      const raw = localStorage.getItem(USER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /* ------------------------------- GIAO DIỆN -------------------------------- */
   function showApp() {
+    document.documentElement.classList.add('has-session');
     $('loginScreen').classList.add('hidden');
     $('app').classList.add('is-active');
   }
 
   function showLogin() {
+    document.documentElement.classList.remove('has-session');
     $('app').classList.remove('is-active');
     $('loginScreen').classList.remove('hidden');
     setError('');
@@ -37,7 +65,6 @@ PU.auth = (function () {
       : '<span class="material-symbols-outlined">login</span> Đăng nhập';
   }
 
-  // Tên, vai trò và avatar chữ cái (phủ ảnh thật nếu người dùng đã tải lên)
   function paintUser(user, role) {
     currentUser = user || null;
     const name = (user && (user.fullName || user.email)) || 'Quản trị viên';
@@ -46,8 +73,6 @@ PU.auth = (function () {
     $('sidebarAvatar').innerHTML = ui.avatar(name, user && user.avatarUrl, 'md');
   }
 
-  // Moderator không thấy các phần tử gắn thuộc tính data-admin-only
-  // (Đơn hàng, Tài chính, Người dùng, Cài đặt). Đăng xuất thì hiện lại tất cả.
   function applyRoleVisibility(role) {
     const hide = role === 'MODERATOR';
     document.querySelectorAll('[data-admin-only]').forEach(el => el.classList.toggle('hidden', hide));
@@ -59,13 +84,13 @@ PU.auth = (function () {
     }
   }
 
-  // Dựng giao diện sau khi đã xác thực xong
-  function startSession(user, role) {
+  function startSession(user, role, skipNavigate) {
     http.setRole(role);
+    saveCachedUser(user);
     paintUser(user, role);
     applyRoleVisibility(role);
     showApp();
-    PU.router.go('dashboard', { force: true });
+    if (!skipNavigate) PU.router.go('dashboard', { force: true });
   }
 
   /* ------------------------------- ĐĂNG NHẬP -------------------------------- */
@@ -85,7 +110,7 @@ PU.auth = (function () {
       assertAllowed(user.role);
 
       http.setToken(token);
-      startSession(user, user.role);
+      startSession(user, user.role, false);
       ui.toast(`Đăng nhập thành công — xin chào ${user.fullName || email}.`, 'ok');
     } catch (e) {
       setError(e.message || 'Đăng nhập thất bại.');
@@ -94,7 +119,6 @@ PU.auth = (function () {
     }
   }
 
-  // Nút con mắt: hiện / ẩn mật khẩu đang gõ
   function togglePassword(forceHide) {
     const input = $('loginPassword');
     const show = !forceHide && input.type === 'password';
@@ -109,24 +133,52 @@ PU.auth = (function () {
   function logout(silent) {
     http.setToken('');
     http.setRole('');
+    http.clearCache();
+    saveCachedUser(null);
     currentUser = null;
     if (PU.router && PU.router.invalidate) PU.router.invalidate();
     applyRoleVisibility('');
-    $('loginPassword').value = '';   // không để lại mật khẩu trên màn hình đăng nhập
+    $('loginPassword').value = '';
     togglePassword(true);
     showLogin();
     if (!silent) ui.toast('Đã đăng xuất.', 'info');
   }
 
   /* --------------------------- KHÔI PHỤC PHIÊN ------------------------------ */
-  // Tải lại trang khi còn token → hỏi GET /auth/me xem token còn hợp lệ không
+  // Mở khung ứng dụng + tải Dashboard SONG SONG với /auth/me thay vì chờ nối tiếp
   async function restore() {
     if (!http.getToken()) return showLogin();
+
+    const cachedRole = http.getRole();
+    const cachedUser = readCachedUser();
+
+    if (cfg.ALLOWED_ROLES.includes(cachedRole)) {
+      paintUser(cachedUser, cachedRole);
+      applyRoleVisibility(cachedRole);
+      showApp();
+      PU.router.go('dashboard', { force: true });
+
+      try {
+        const freshUser = (await http.get('/auth/me')) || {};
+        const freshRole = freshUser.role || cachedRole;
+        assertAllowed(freshRole);
+        const roleChanged = freshRole !== cachedRole;
+        startSession(freshUser, freshRole, !roleChanged);
+      } catch (e) {
+        if (e && (e.status === 401 || e.status === 403)) {
+          logout(true);
+          setError('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
+        }
+      }
+      return;
+    }
+
+    // Chưa có role lưu sẵn → kiểm tra /auth/me trước
     try {
       const user = (await http.get('/auth/me')) || {};
       const role = user.role || http.getRole();
       assertAllowed(role);
-      startSession(user, role);
+      startSession(user, role, false);
     } catch (e) {
       logout(true);
       setError(e.status === 401 ? 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.' : e.message);
